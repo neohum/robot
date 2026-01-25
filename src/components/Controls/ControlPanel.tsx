@@ -29,10 +29,35 @@ export default function ControlPanel({
   executionSpeed,
   onSpeedChange,
 }: ControlPanelProps) {
+  const handleRun = () => {
+    console.log('[ControlPanel] Run button clicked')
+    onRun()
+  }
+
+  const handleStop = () => {
+    console.log('[ControlPanel] Stop button clicked')
+    onStop()
+  }
+
+  const handleReset = () => {
+    console.log('[ControlPanel] Reset button clicked')
+    onReset()
+  }
+
+  const handleExamples = () => {
+    console.log('[ControlPanel] Examples button clicked')
+    onExamples()
+  }
+
+  const handleClearWorkspace = () => {
+    console.log('[ControlPanel] Clear workspace button clicked')
+    onClearWorkspace()
+  }
+
   return (
     <div className="flex items-center gap-2">
       <button
-        onClick={onClearWorkspace}
+        onClick={handleClearWorkspace}
         className="bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -42,7 +67,7 @@ export default function ControlPanel({
       </button>
 
       <button
-        onClick={onRun}
+        onClick={handleRun}
         disabled={isRunning}
         className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-medium py-2 px-6 rounded-lg transition-colors flex items-center gap-2"
       >
@@ -56,7 +81,7 @@ export default function ControlPanel({
       </button>
 
       <button
-        onClick={onStop}
+        onClick={handleStop}
         disabled={!isRunning}
         className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:text-gray-400 text-white font-medium py-2 px-4 rounded-lg transition-colors"
       >
@@ -64,7 +89,7 @@ export default function ControlPanel({
       </button>
 
       <button
-        onClick={onReset}
+        onClick={handleReset}
         className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -95,7 +120,7 @@ export default function ControlPanel({
       <div className="w-px h-8 bg-gray-600 mx-2" />
 
       <button
-        onClick={onExamples}
+        onClick={handleExamples}
         className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">

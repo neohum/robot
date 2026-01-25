@@ -68,15 +68,21 @@ export class AnimationController {
     duration: number,
     onUpdate: (angles: HumanoidJointAngles) => void
   ): Promise<void> {
+    console.log('[AnimationController] Starting animation, duration:', duration)
+    console.log('[AnimationController] Current:', currentAngles)
+    console.log('[AnimationController] Target:', targetAngles)
+    
     return new Promise((resolve, reject) => {
       const startTime = Date.now();
       const startAngles = { ...currentAngles };
       const jointKeys = Object.keys(currentAngles) as HumanoidJointKey[];
+      let frameCount = 0;
 
       const animate = () => {
         // 중지 체크
         if (this.isStopped) {
           this.currentAnimationId = null;
+          console.log('[AnimationController] Animation stopped')
           reject(new Error('STOP_REQUESTED'));
           return;
         }
@@ -99,12 +105,18 @@ export class AnimationController {
           newAngles[key] = startAngles[key] + (targetAngles[key] - startAngles[key]) * easeProgress;
         }
 
+        frameCount++;
+        if (frameCount % 30 === 0 || progress === 1) {
+          console.log(`[AnimationController] Frame ${frameCount}, progress: ${(progress * 100).toFixed(1)}%`)
+        }
+
         onUpdate(newAngles);
 
         if (progress < 1) {
           this.currentAnimationId = requestAnimationFrame(animate);
         } else {
           this.currentAnimationId = null;
+          console.log('[AnimationController] Animation completed, frames:', frameCount)
           resolve();
         }
       };

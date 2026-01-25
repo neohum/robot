@@ -317,3 +317,150 @@ export const testExternalModelSync = async (): Promise<{
     };
   }
 };
+
+// ============================================
+// Wasabi 서버 기반 외부 모델 함수들
+// ============================================
+
+export interface WasabiExternalModel {
+  id: string
+  name: string
+  timestamp: number
+  size: number
+  boneMapping?: Record<string, string>
+  scale?: number
+}
+
+// Wasabi에 모델 업로드
+export const uploadModelToWasabi = async (
+  file: File,
+  boneMapping?: Record<string, string>,
+  scale?: number
+): Promise<{ success: boolean; id?: string; url?: string; error?: string }> => {
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('name', file.name)
+    if (boneMapping) {
+      formData.append('boneMapping', JSON.stringify(boneMapping))
+    }
+    if (scale) {
+      formData.append('scale', scale.toString())
+    }
+
+    const response = await fetch('/api/external-models', {
+      method: 'POST',
+      body: formData,
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Upload failed')
+    }
+
+    // 로컬에도 저장 (URL과 ID)
+    saveExternalModel(data.metadata.name, data.url, 'url', scale)
+
+    return {
+      success: true,
+      id: data.id,
+      url: data.url,
+    }
+  } catch (error: any) {
+    console.error('Wasabi upload error:', error)
+    return {
+      success: false,
+      error: error.message,
+    }
+  }
+}
+
+// Wasabi에서 모델 목록 가져오기
+export const getModelsFromWasabi = async (): Promise<WasabiExternalModel[]> => {
+  try {
+    const response = await fetch('/api/external-models')
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to get models')
+    }
+
+    return data.models || []
+  } catch (error: any) {
+    console.error('Wasabi get models error:', error)
+    return []
+  }
+}
+
+// Wasabi에서 특정 모델의 URL 가져오기
+export const getModelUrlFromWasabi = async (id: string): Promise<{ success: boolean; url?: string; metadata?: WasabiExternalModel; error?: string }> => {
+  try {
+    const response = await fetch(`/api/external-models?id=${encodeURIComponent(id)}`)
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to get model URL')
+    }
+
+    return {
+      success: true,
+      url: data.url,
+      metadata: data.metadata,
+    }
+  } catch (error: any) {
+    console.error('Wasabi get URL error:', error)
+    return {
+      success: false,
+      error: error.message,
+    }
+  }
+}
+
+// Wasabi에서 모델 삭제
+export const deleteModelFromWasabi = async (id: string): Promise<boolean> => {
+  try {
+    const response = await fetch(`/api/external-models?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to delete model')
+    }
+
+    return true
+  } catch (error: any) {
+    console.error('Wasabi delete error:', error)
+    return false
+  }
+}
+
+// Wasabi에 메타데이터 업데이트 (본 매핑, 스케일)
+export const updateModelMetadataInWasabi = async (
+  id: string,
+  boneMapping?: Record<string, string>,
+  scale?: number
+): Promise<boolean> => {
+  try {
+    const response = await fetch('/api/external-models', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ id, boneMapping, scale }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to update metadata')
+    }
+
+    return true
+  } catch (error: any) {
+    console.error('Wasabi update metadata error:', error)
+    return false
+  }
+}

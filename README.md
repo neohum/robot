@@ -4,6 +4,17 @@ Three.js와 Blockly를 활용한 3D 로봇 팔 제어 시뮬레이터
 
 ## ✨ 주요 기능
 
+### 🎨 3D 캐릭터 커스터마이징
+- **텍스처 에디터**: 1024x1024 2D 캔버스로 직접 텍스처 그리기
+  - 10가지 도구: 브러시, 지우개, 도형, 텍스트, 그라데이션, 채우기, 스포이드 등
+  - 레이어 시스템 (추가/삭제/복제/순서변경)
+  - 실행 취소/다시 실행 (최대 50단계)
+  - UV 매핑 가이드 오버레이
+  - 실시간 3D 모델 적용
+- **의상 시스템**: 상의/하의/신발 선택 및 커스터마이징
+- **악세서리**: 모자, 안경, 가방, 장신구
+- **외부 3D 모델 지원**: Wasabi 스토리지에서 GLB 모델 로드
+
 ### 🎮 블록 코딩 인터페이스
 - Google Blockly 기반의 직관적인 드래그 앤 드롭 인터페이스
 - 커스텀 로봇 제어 블록:
@@ -53,6 +64,27 @@ npm run dev
 npm run build
 npm start
 ```
+
+### 3D 모델 관리 (Wasabi)
+
+```bash
+# 환경 설정
+cp .env.local.example .env.local
+# .env.local에 Wasabi 키 입력
+
+# 모델 업로드 (GLB, GLTF, FBX, OBJ 지원)
+npm run upload-model -- --file ./model.glb --path outfits/tops/tshirt.glb
+npm run upload-model -- --file ./character.fbx --path outfits/fullbody/character.fbx
+
+# 카탈로그 생성
+npm run generate-catalog
+```
+
+**Cinema 4D 파일(.c4d) 사용하기:**
+- C4D 파일은 GLB로 변환 후 업로드하세요
+- 자세한 가이드: [C4D to Web Guide](./docs/C4D_TO_WEB_GUIDE.md)
+
+자세한 내용은 [3D 모델 다운로드 가이드](./docs/3D_MODEL_DOWNLOAD_GUIDE.md)를 참고하세요.
 
 ## 📖 사용 방법
 

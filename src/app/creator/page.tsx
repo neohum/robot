@@ -166,6 +166,10 @@ export default function CreatorPage() {
   const [skinColorIndex, setSkinColorIndex] = useState(0)
   const [modelName, setModelName] = useState('내 캐릭터')
   const [isExporting, setIsExporting] = useState(false)
+  
+  // 외부 모델 URL 및 타입
+  const [externalModelUrl, setExternalModelUrl] = useState<string | null>(null)
+  const [externalModelType, setExternalModelType] = useState<string | null>(null)
 
   // 의상 설정
   const [outfitConfig, setOutfitConfig] = useState<OutfitConfig>({
@@ -214,6 +218,31 @@ export default function CreatorPage() {
       toast.success('GLB 파일이 다운로드됩니다!')
       setIsExporting(false)
     }, 1500)
+  }
+
+  // 파일 업로드 핸들러
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // 파일 형식 체크 (GLB만 허용 - 텍스처가 포함되어 있음)
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    if (ext !== 'glb') {
+      toast.error('GLB 파일만 지원됩니다. GLTF 파일은 GLB로 변환 후 업로드하세요.')
+      return
+    }
+
+    // 파일 크기 체크 (20MB)
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error('파일 크기는 20MB 이하여야 합니다')
+      return
+    }
+
+    // URL 생성 및 타입 저장
+    const url = URL.createObjectURL(file)
+    setExternalModelUrl(url)
+    setExternalModelType('glb')
+    toast.success(`${file.name} 파일이 로드되었습니다`)
   }
 
   const handleRandomize = () => {
@@ -409,6 +438,8 @@ export default function CreatorPage() {
               skinColor={SKIN_COLORS[skinColorIndex]}
               outfitConfig={isHumanoid ? outfitConfig : undefined}
               accessories={isHumanoid ? accessories.filter(a => a.enabled) : []}
+              externalModelUrl={externalModelUrl}
+              externalModelType={externalModelType}
             />
           </Suspense>
 
@@ -489,6 +520,54 @@ export default function CreatorPage() {
 
             {activeTab === 'outfit' && isHumanoid && (
               <div className="space-y-6">
+                {/* 외부 모델 업로드 */}
+                <div className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-lg p-4 border border-blue-500/30">
+                  <h4 className="text-white text-sm font-medium mb-3 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    외부 3D 모델 업로드
+                  </h4>
+                  <p className="text-gray-400 text-xs mb-3">
+                    GLB 파일만 지원 (텍스처 포함, 최대 20MB)<br/>
+                    <span className="text-yellow-400">💡 GLTF는 GLB로 변환 필요</span>
+                  </p>
+                  <label className="block">
+                    <input
+                      type="file"
+                      accept=".glb"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      id="model-upload"
+                    />
+                    <div className="bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      파일 선택
+                    </div>
+                  </label>
+                  {externalModelUrl && (
+                    <div className="mt-3 flex items-center justify-between bg-green-600/20 border border-green-500/30 rounded px-3 py-2">
+                      <span className="text-green-400 text-xs">✓ 모델 로드됨</span>
+                      <button
+                        onClick={() => {
+                          setExternalModelUrl(null)
+                          setExternalModelType(null)
+                          toast.info('외부 모델이 제거되었습니다')
+                        }}
+                        className="text-red-400 hover:text-red-300 text-xs"
+                      >
+                        제거
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t border-gray-700 pt-4">
+                  <p className="text-gray-500 text-xs mb-4">또는 기본 의상 선택:</p>
+                </div>
+
                 {/* 상의 */}
                 <div>
                   <h4 className="text-white text-sm font-medium mb-2">상의</h4>
@@ -648,9 +727,10 @@ export default function CreatorPage() {
               </div>
             )}
 
+            {/* 동물 캐릭터는 의상/악세서리 미지원 */}
             {!isHumanoid && (activeTab === 'outfit' || activeTab === 'accessory') && (
               <div className="text-center py-8 text-gray-500">
-                <p>동물 캐릭터는 의상/악세서리를</p>
+                <p>동물 캐릭터는 의상/악세사리를</p>
                 <p>지원하지 않습니다</p>
               </div>
             )}

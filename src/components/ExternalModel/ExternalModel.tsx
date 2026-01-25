@@ -335,16 +335,28 @@ export default function ExternalModel({
         let boneCount = 0
         let skinnedMeshCount = 0
         let objectCount = 0
+        let meshCount = 0
+        const meshParents: string[] = []
         loadedModel.traverse((child) => {
           if (child instanceof THREE.Bone) boneCount++
           if (child instanceof THREE.SkinnedMesh) skinnedMeshCount++
+          if (child instanceof THREE.Mesh) {
+            meshCount++
+            if (child.parent) {
+              meshParents.push(`${child.name || '(unnamed)'} -> parent: ${child.parent.name || '(unnamed)'}`)
+            }
+          }
           if (child instanceof THREE.Object3D) objectCount++
         })
         console.log('[ExternalModel] 모델 구조:', {
           bones: boneCount,
           skinnedMeshes: skinnedMeshCount,
+          meshes: meshCount,
           objects: objectCount
         })
+        if (meshParents.length > 0) {
+          console.log('[ExternalModel] Mesh 위치:', meshParents.slice(0, 10))
+        }
 
         // 본 매핑 계산
         const { allBones, mappings } = recalculateBoneMappings(loadedModel, customBoneMapping)
@@ -437,10 +449,19 @@ export default function ExternalModel({
 
       if (angle !== undefined && config && initialRot && bone) {
         // 각도 변경 시 로그 (프레임마다 출력하지 않도록)
-        if (lastAppliedAngleRef.current[jointKey] !== angle && angle !== 0) {
+        const angleChanged = lastAppliedAngleRef.current[jointKey] !== angle
+        if (angleChanged && angle !== 0) {
           console.log(`[ExternalModel] 관절 회전: ${jointKey} = ${angle}° → 본: ${boneName}`)
+          console.log(`  - bone 타입: ${bone.type}, 자식 수: ${bone.children.length}`)
+          console.log(`  - 현재 rotation: x=${bone.rotation.x.toFixed(2)}, y=${bone.rotation.y.toFixed(2)}, z=${bone.rotation.z.toFixed(2)}`)
+          console.log(`  - initialRot: x=${initialRot.x.toFixed(2)}, y=${initialRot.y.toFixed(2)}, z=${initialRot.z.toFixed(2)}`)
+          // 자식 타입 확인
+          if (bone.children.length > 0) {
+            const childTypes = bone.children.slice(0, 3).map(c => c.type).join(', ')
+            console.log(`  - 자식 타입들: ${childTypes}`)
+          }
           lastAppliedAngleRef.current[jointKey] = angle
-        } else if (lastAppliedAngleRef.current[jointKey] !== angle && angle === 0) {
+        } else if (angleChanged && angle === 0) {
           lastAppliedAngleRef.current[jointKey] = angle
         }
 
@@ -458,6 +479,15 @@ export default function ExternalModel({
             bone.rotation.z = initialRot.z + radians
             break
         }
+        
+        // 디버깅: 회전 적용 후 값 확인
+        if (angleChanged && angle !== 0) {
+          console.log(`  - 적용 후 rotation.${config.axis}=${bone.rotation[config.axis].toFixed(2)} (radians: ${radians.toFixed(2)})`)
+        }
+        
+        // 회전 적용 후 업데이트 필요
+        bone.updateMatrix()
+        bone.updateMatrixWorld(true)
       }
     }
   })

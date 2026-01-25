@@ -10,7 +10,7 @@ import type { ModelType } from '@/components/Scene/RobotScene'
 import { AnimationController } from '@/lib/animationController'
 import { generateCode } from '@/lib/blockly/codeGenerator'
 import { generatePythonCode } from '@/lib/blockly/pythonGenerator'
-import { saveProject, loadProject, getAllProjects, deleteProject, saveCurrentWorkspace, loadCurrentWorkspace, SavedProject, saveExternalModel, getAllExternalModels, deleteExternalModel, loadCurrentExternalModel, saveCurrentExternalModel, testExternalModelSync, SavedExternalModel, saveBoneMapping, loadBoneMapping, SavedBoneMapping } from '@/lib/storage'
+import { saveProject, loadProject, getAllProjects, deleteProject, saveCurrentWorkspace, loadCurrentWorkspace, SavedProject, saveExternalModel, getAllExternalModels, deleteExternalModel, loadCurrentExternalModel, saveCurrentExternalModel, testExternalModelSync, SavedExternalModel, saveBoneMapping, loadBoneMapping, SavedBoneMapping, uploadModelToWasabi, getModelsFromWasabi, getModelUrlFromWasabi, updateModelMetadataInWasabi } from '@/lib/storage'
 import type { BoneMapping } from '@/components/ExternalModel/ExternalModel'
 import { EXAMPLE_PROGRAMS } from '@/lib/examples'
 import ControlPanel from '@/components/Controls/ControlPanel'
@@ -79,6 +79,11 @@ export default function Home() {
   // jointAnglesRef를 항상 최신 상태로 유지
   useEffect(() => {
     jointAnglesRef.current = jointAngles
+    // 디버깅: 특정 관절이 0이 아닐 때만 로그
+    const nonZeroJoints = Object.entries(jointAngles).filter(([_, value]) => Math.abs(value) > 0.1)
+    if (nonZeroJoints.length > 0) {
+      console.log('[Simulator] Joint angles updated:', nonZeroJoints.map(([key, value]) => `${key}=${value.toFixed(1)}°`).join(', '))
+    }
   }, [jointAngles])
 
   // robotPositionRef를 항상 최신 상태로 유지
@@ -105,11 +110,45 @@ export default function Home() {
     // 저장된 외부 모델 목록 불러오기
     setSavedExternalModels(getAllExternalModels())
 
+    // Wasabi에서 모델 목록 불러오기 (백그라운드)
+    getModelsFromWasabi().then(wasabiModels => {
+      if (wasabiModels.length > 0) {
+        console.log('[Simulator] Wasabi에서 모델 목록 로드됨:', wasabiModels.length, '개')
+        // Wasabi 모델을 로컬 스토리지와 병합 (중복 제거)
+        const localModels = getAllExternalModels()
+        wasabiModels.forEach(wm => {
+          // ID로 URL 가져와서 로컬에 저장 (필요시)
+          localStorage.setItem(`wasabi-model-id-${wm.name}`, wm.id)
+        })
+      }
+    })
+
     // 마지막으로 사용한 외부 모델 불러오기 (blob URL은 만료되므로 건너뛰기)
     const currentExternal = loadCurrentExternalModel()
     if (currentExternal && !currentExternal.url.startsWith('blob:')) {
       setExternalModelUrl(currentExternal.url)
       setExternalModelName(currentExternal.name || '')
+      setModelType('external')
+      
+      // URL이 Wasabi presigned URL이고 만료되었을 수 있으므로 재생성
+      if (currentExternal.url.includes('wasabisys.com')) {
+        const modelId = localStorage.getItem(`wasabi-model-id-${currentExternal.name}`)
+        if (modelId) {
+          getModelUrlFromWasabi(modelId).then(result => {
+            if (result.success && result.url) {
+              console.log('[Simulator] Wasabi URL 갱신됨')
+              setExternalModelUrl(result.url)
+              saveCurrentExternalModel(result.url, currentExternal.name || '')
+              
+              // 메타데이터에 본 매핑이 있으면 불러오기
+              if (result.metadata?.boneMapping) {
+                setCustomBoneMapping(result.metadata.boneMapping as Record<HumanoidJointKey, string>)
+                console.log('[Simulator] Wasabi에서 본 매핑 로드됨')
+              }
+            }
+          })
+        }
+      }
     } else if (currentExternal?.url.startsWith('blob:')) {
       console.log('[Simulator] Blob URL 만료됨, 모델 초기화')
       // 만료된 blob URL은 저장소에서도 제거
@@ -119,14 +158,18 @@ export default function Home() {
 
   // 단일 관절 회전
   const rotateJoint = async (joint: HumanoidJointKey, angle: number) => {
+    console.log(`[Simulator] rotateJoint called: ${joint} = ${angle}°`)
     const currentAngles = jointAnglesRef.current
     const targetAngles = { ...currentAngles, [joint]: angle }
+    console.log('[Simulator] Current angles:', currentAngles)
+    console.log('[Simulator] Target angles:', targetAngles)
     await animationController.current.animateHumanoidJoints(
       currentAngles,
       targetAngles,
       getAdjustedDuration(1000),
       setJointAngles
     )
+    console.log(`[Simulator] rotateJoint completed: ${joint}`)
   }
 
   // 그리퍼 설정
@@ -490,13 +533,27 @@ export default function Home() {
   }
 
   const executeBlockCode = async () => {
-    if (!workspaceRef.current) return
+    if (!workspaceRef.current) {
+      console.error('[Simulator] workspaceRef.current is null')
+      toast.error('블록 작업 공간이 초기화되지 않았습니다.')
+      return
+    }
 
+    console.log('[Simulator] Executing block code...')
     stopRequestedRef.current = false
     animationController.current.reset()
     setIsRunning(true)
     const code = generateCode(workspaceRef.current)
+    console.log('[Simulator] Generated code length:', code.length)
+    console.log('[Simulator] Generated code:\n', code)
     setGeneratedCode(code)
+
+    if (!code || code.trim().length === 0) {
+      console.warn('[Simulator] No code generated')
+      toast.warning('실행할 블록이 없습니다.')
+      setIsRunning(false)
+      return
+    }
 
     try {
       const asyncFunction = new Function(
@@ -537,9 +594,12 @@ export default function Home() {
       if ((error as Error).message !== 'STOP_REQUESTED') {
         console.error('코드 실행 오류:', error)
         toast.error('코드 실행 중 오류가 발생했습니다.')
+      } else {
+        console.log('[Simulator] Execution stopped by user')
       }
     }
 
+    console.log('[Simulator] Execution completed')
     setIsRunning(false)
   }
 
@@ -782,7 +842,10 @@ export default function Home() {
   }
 
   const handleLoadExample = (xml: string) => {
+    console.log('[Simulator] Loading example, XML length:', xml.length)
     setWorkspaceXml(xml)
+    setShowExamplesDialog(false)
+    toast.success('예제를 불러왔습니다!')
   }
 
   const handleClearWorkspace = () => {
@@ -795,22 +858,51 @@ export default function Home() {
     }
   }
 
-  // 외부 GLB 파일 로드
-  const handleExternalModelLoad = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 외부 GLB 파일 로드 (Wasabi에 업로드)
+  const handleExternalModelLoad = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      const url = URL.createObjectURL(file)
       const name = file.name.replace(/\.(glb|gltf)$/i, '')
-      boneMappingLoadedRef.current = false // 새 모델이므로 리셋
+      
+      // 즉시 Blob URL로 미리보기 시작
+      const blobUrl = URL.createObjectURL(file)
+      boneMappingLoadedRef.current = false
       setCustomBoneMapping({} as Record<HumanoidJointKey, string>)
-      setExternalModelUrl(url)
+      setExternalModelUrl(blobUrl)
       setExternalModelName(name)
       setModelType('external')
-      saveCurrentExternalModel(url, name)
-      saveExternalModel(name, url, 'file')
-      setSavedExternalModels(getAllExternalModels())
       setShowExternalModelDialog(false)
-      toast.success(`"${file.name}" 모델을 불러왔습니다!`)
+      
+      // 백그라운드에서 Wasabi에 업로드
+      toast.promise(
+        uploadModelToWasabi(file, customBoneMapping),
+        {
+          loading: `"${file.name}" 를 Wasabi에 업로드 중...`,
+          success: (result) => {
+            if (result.success && result.url && result.id) {
+              // Wasabi URL로 교체
+              setExternalModelUrl(result.url)
+              saveCurrentExternalModel(result.url, name)
+              saveExternalModel(name, result.url, 'url')
+              setSavedExternalModels(getAllExternalModels())
+              // Blob URL 정리
+              URL.revokeObjectURL(blobUrl)
+              // ID를 로컬 스토리지에 저장 (나중에 메타데이터 업데이트 시 사용)
+              localStorage.setItem(`wasabi-model-id-${name}`, result.id)
+              return `"${file.name}" 업로드 완료! 이제 새로고침해도 모델이 유지됩니다.`
+            }
+            return '업로드 완료'
+          },
+          error: (error) => {
+            console.error('Wasabi upload failed:', error)
+            // 업로드 실패해도 Blob URL로 계속 사용 가능
+            saveCurrentExternalModel(blobUrl, name)
+            saveExternalModel(name, blobUrl, 'file')
+            setSavedExternalModels(getAllExternalModels())
+            return '업로드 실패했지만 현재 세션에서는 모델을 사용할 수 있습니다.'
+          }
+        }
+      )
     }
   }
 
@@ -887,14 +979,30 @@ export default function Home() {
     }))
   }
 
-  // 본 매핑 저장 (동기화)
-  const handleSaveBoneMapping = () => {
+  // 본 매핑 저장 (로컬 + Wasabi 동기화)
+  const handleSaveBoneMapping = async () => {
     if (!externalModelName) {
       toast.error('모델 이름이 없습니다')
       return
     }
+    
+    // 로컬에 저장
     saveBoneMapping(externalModelName, customBoneMapping)
-    toast.success('본 매핑이 저장되었습니다!')
+    
+    // Wasabi에도 메타데이터 업데이트
+    const modelId = localStorage.getItem(`wasabi-model-id-${externalModelName}`)
+    if (modelId) {
+      toast.promise(
+        updateModelMetadataInWasabi(modelId, customBoneMapping),
+        {
+          loading: 'Wasabi에 본 매핑 동기화 중...',
+          success: () => '본 매핑이 저장되고 Wasabi에 동기화되었습니다!',
+          error: () => '본 매핑은 로컬에 저장되었지만 Wasabi 동기화에 실패했습니다.'
+        }
+      )
+    } else {
+      toast.success('본 매핑이 로컬에 저장되었습니다!')
+    }
   }
 
   // 전체 자동 매핑

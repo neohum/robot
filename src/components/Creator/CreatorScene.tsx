@@ -1,17 +1,20 @@
 'use client'
 
-import React, { useRef, useEffect, Suspense } from 'react'
+import React, { useRef, useEffect, Suspense, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Grid, PerspectiveCamera, useGLTF } from '@react-three/drei'
+import { OrbitControls, Grid, PerspectiveCamera } from '@react-three/drei'
 import * as THREE from 'three'
 import { GLTFExporter } from 'three-stdlib'
 import type { SkeletonType, OutfitConfig, AccessoryConfig } from '@/app/creator/page'
+import ModelLoader from '../ModelLoader'
 
 interface CreatorSceneProps {
   skeletonType: SkeletonType
   skinColor: string
   outfitConfig?: OutfitConfig
   accessories?: AccessoryConfig[]
+  externalModelUrl?: string | null
+  externalModelType?: string | null
 }
 
 // 스켈레톤 타입별 스케일
@@ -635,41 +638,957 @@ function RobotModel({ skeletonType, skinColor }: RobotModelProps) {
   )
 }
 
-// 외부 GLB 모델 로더
-function ExternalModel({ url, scale = 1, position = [0, 0, 0] as [number, number, number] }: {
-  url: string
-  scale?: number
-  position?: [number, number, number]
-}) {
-  const { scene } = useGLTF(url)
-  const modelRef = useRef<THREE.Group>(null)
+// 의상 상의 컴포넌트
+function OutfitTop({ type, color, scale }: { type: string; color: string; scale: number }) {
+  if (type === 'none') return null
+  const s = scale
 
-  useEffect(() => {
-    if (scene) {
-      const box = new THREE.Box3().setFromObject(scene)
-      const size = box.getSize(new THREE.Vector3())
-      const maxDim = Math.max(size.x, size.y, size.z)
-      const targetSize = 1.5 * scale
-      const scaleFactor = targetSize / maxDim
+  if (type === 'tshirt') {
+    return (
+      <group name="outfit-tshirt">
+        {/* 메인 상체 */}
+        <mesh position={[0, 1.15 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.22 * s, 0.2 * s, 0.45 * s, 24]} />
+          <meshStandardMaterial 
+            color={color} 
+            roughness={0.7}
+            metalness={0.1}
+          />
+        </mesh>
+        {/* 왼쪽 소매 */}
+        <mesh position={[-0.3 * s, 1.25 * s, 0]} rotation={[0, 0, 0.8]} castShadow>
+          <cylinderGeometry args={[0.08 * s, 0.095 * s, 0.22 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        {/* 오른쪽 소매 */}
+        <mesh position={[0.3 * s, 1.25 * s, 0]} rotation={[0, 0, -0.8]} castShadow>
+          <cylinderGeometry args={[0.08 * s, 0.095 * s, 0.22 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        {/* 넥라인 디테일 */}
+        <mesh position={[0, 1.37 * s, 0.12 * s]} castShadow>
+          <torusGeometry args={[0.08 * s, 0.01 * s, 8, 24, Math.PI]} />
+          <meshStandardMaterial color={color} roughness={0.6} />
+        </mesh>
+        {/* 주름 디테일 (앞면) */}
+        <mesh position={[-0.05 * s, 1.1 * s, 0.195 * s]} castShadow>
+          <cylinderGeometry args={[0.002 * s, 0.002 * s, 0.3 * s, 8]} />
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </mesh>
+        <mesh position={[0.05 * s, 1.1 * s, 0.195 * s]} castShadow>
+          <cylinderGeometry args={[0.002 * s, 0.002 * s, 0.3 * s, 8]} />
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </mesh>
+      </group>
+    )
+  }
 
-      scene.scale.setScalar(scaleFactor)
+  if (type === 'jacket') {
+    return (
+      <group name="outfit-jacket">
+        {/* 메인 자켓 몸체 */}
+        <mesh position={[0, 1.12 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.24 * s, 0.22 * s, 0.52 * s, 24]} />
+          <meshStandardMaterial 
+            color={color} 
+            roughness={0.6}
+            metalness={0.2}
+          />
+        </mesh>
+        {/* 왼쪽 소매 (더 두껍고 정교하게) */}
+        <mesh position={[-0.32 * s, 1.1 * s, 0]} rotation={[0, 0, 0.3]} castShadow>
+          <cylinderGeometry args={[0.075 * s, 0.095 * s, 0.48 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.6} />
+        </mesh>
+        {/* 왼쪽 커프스 */}
+        <mesh position={[-0.32 * s, 0.87 * s, 0]} rotation={[0, 0, 0.3]} castShadow>
+          <cylinderGeometry args={[0.095 * s, 0.095 * s, 0.04 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.5} metalness={0.3} />
+        </mesh>
+        {/* 오른쪽 소매 */}
+        <mesh position={[0.32 * s, 1.1 * s, 0]} rotation={[0, 0, -0.3]} castShadow>
+          <cylinderGeometry args={[0.075 * s, 0.095 * s, 0.48 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.6} />
+        </mesh>
+        {/* 오른쪽 커프스 */}
+        <mesh position={[0.32 * s, 0.87 * s, 0]} rotation={[0, 0, -0.3]} castShadow>
+          <cylinderGeometry args={[0.095 * s, 0.095 * s, 0.04 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.5} metalness={0.3} />
+        </mesh>
+        {/* 칼라 */}
+        <mesh position={[0, 1.37 * s, 0.08 * s]} rotation={[0.5, 0, 0]} castShadow>
+          <boxGeometry args={[0.22 * s, 0.1 * s, 0.03 * s]} />
+          <meshStandardMaterial color={color} roughness={0.5} />
+        </mesh>
+        {/* 왼쪽 라펠 */}
+        <mesh position={[-0.08 * s, 1.3 * s, 0.13 * s]} rotation={[0.4, 0.3, 0]} castShadow>
+          <boxGeometry args={[0.08 * s, 0.15 * s, 0.02 * s]} />
+          <meshStandardMaterial color={color} roughness={0.5} />
+        </mesh>
+        {/* 오른쪽 라펠 */}
+        <mesh position={[0.08 * s, 1.3 * s, 0.13 * s]} rotation={[0.4, -0.3, 0]} castShadow>
+          <boxGeometry args={[0.08 * s, 0.15 * s, 0.02 * s]} />
+          <meshStandardMaterial color={color} roughness={0.5} />
+        </mesh>
+        {/* 지퍼/버튼 라인 */}
+        <mesh position={[0, 1.15 * s, 0.215 * s]} castShadow>
+          <boxGeometry args={[0.01 * s, 0.45 * s, 0.01 * s]} />
+          <meshStandardMaterial color="#333333" metalness={0.7} roughness={0.3} />
+        </mesh>
+        {/* 포켓 (왼쪽) */}
+        <mesh position={[-0.12 * s, 0.98 * s, 0.21 * s]} castShadow>
+          <boxGeometry args={[0.06 * s, 0.08 * s, 0.01 * s]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        {/* 포켓 (오른쪽) */}
+        <mesh position={[0.12 * s, 0.98 * s, 0.21 * s]} castShadow>
+          <boxGeometry args={[0.06 * s, 0.08 * s, 0.01 * s]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        {/* 어깨 심 */}
+        <mesh position={[-0.2 * s, 1.35 * s, 0]} rotation={[0, 0, -0.3]} castShadow>
+          <cylinderGeometry args={[0.002 * s, 0.002 * s, 0.12 * s, 8]} />
+          <meshStandardMaterial color={color} roughness={0.9} />
+        </mesh>
+        <mesh position={[0.2 * s, 1.35 * s, 0]} rotation={[0, 0, 0.3]} castShadow>
+          <cylinderGeometry args={[0.002 * s, 0.002 * s, 0.12 * s, 8]} />
+          <meshStandardMaterial color={color} roughness={0.9} />
+        </mesh>
+      </group>
+    )
+  }
 
-      box.setFromObject(scene)
-      const minY = box.min.y
-      scene.position.y = -minY + position[1]
-      scene.position.x = position[0]
-      scene.position.z = position[2]
-    }
-  }, [scene, scale, position])
+  if (type === 'hoodie') {
+    return (
+      <group name="outfit-hoodie">
+        {/* 메인 후드티 몸체 */}
+        <mesh position={[0, 1.1 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.25 * s, 0.23 * s, 0.57 * s, 24]} />
+          <meshStandardMaterial 
+            color={color} 
+            roughness={0.8}
+            metalness={0.05}
+          />
+        </mesh>
+        {/* 왼쪽 소매 */}
+        <mesh position={[-0.32 * s, 1.08 * s, 0]} rotation={[0, 0, 0.3]} castShadow>
+          <cylinderGeometry args={[0.08 * s, 0.1 * s, 0.52 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </mesh>
+        {/* 왼쪽 커프스 (리브 디테일) */}
+        <mesh position={[-0.32 * s, 0.83 * s, 0]} rotation={[0, 0, 0.3]} castShadow>
+          <cylinderGeometry args={[0.09 * s, 0.09 * s, 0.05 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.9} />
+        </mesh>
+        {/* 오른쪽 소매 */}
+        <mesh position={[0.32 * s, 1.08 * s, 0]} rotation={[0, 0, -0.3]} castShadow>
+          <cylinderGeometry args={[0.08 * s, 0.1 * s, 0.52 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </mesh>
+        {/* 오른쪽 커프스 */}
+        <mesh position={[0.32 * s, 0.83 * s, 0]} rotation={[0, 0, -0.3]} castShadow>
+          <cylinderGeometry args={[0.09 * s, 0.09 * s, 0.05 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.9} />
+        </mesh>
+        {/* 후드 메인 */}
+        <mesh position={[0, 1.45 * s, -0.1 * s]} castShadow>
+          <sphereGeometry args={[0.16 * s, 16, 16, 0, Math.PI * 2, 0, Math.PI / 1.8]} />
+          <meshStandardMaterial color={color} roughness={0.8} side={THREE.DoubleSide} />
+        </mesh>
+        {/* 후드 입구 */}
+        <mesh position={[0, 1.38 * s, 0.05 * s]} rotation={[0.3, 0, 0]} castShadow>
+          <torusGeometry args={[0.09 * s, 0.015 * s, 12, 24]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        {/* 캥거루 포켓 */}
+        <mesh position={[0, 1.05 * s, 0.235 * s]} castShadow>
+          <boxGeometry args={[0.18 * s, 0.12 * s, 0.03 * s]} />
+          <meshStandardMaterial color={color} roughness={0.85} />
+        </mesh>
+        {/* 포켓 입구 라인 */}
+        <mesh position={[0, 1.11 * s, 0.245 * s]} castShadow>
+          <boxGeometry args={[0.16 * s, 0.005 * s, 0.005 * s]} />
+          <meshStandardMaterial color={color} roughness={0.95} />
+        </mesh>
+        {/* 후드 끈 (왼쪽) */}
+        <mesh position={[-0.04 * s, 1.35 * s, 0.13 * s]} castShadow>
+          <cylinderGeometry args={[0.006 * s, 0.006 * s, 0.15 * s, 8]} />
+          <meshStandardMaterial color="#CCCCCC" roughness={0.6} />
+        </mesh>
+        {/* 후드 끈 (오른쪽) */}
+        <mesh position={[0.04 * s, 1.35 * s, 0.13 * s]} castShadow>
+          <cylinderGeometry args={[0.006 * s, 0.006 * s, 0.15 * s, 8]} />
+          <meshStandardMaterial color="#CCCCCC" roughness={0.6} />
+        </mesh>
+        {/* 밑단 리브 */}
+        <mesh position={[0, 0.82 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.22 * s, 0.22 * s, 0.04 * s, 24]} />
+          <meshStandardMaterial color={color} roughness={0.9} />
+        </mesh>
+      </group>
+    )
+  }
 
-  return (
-    <group ref={modelRef}>
-      <primitive object={scene.clone()} />
-    </group>
-  )
+  if (type === 'tank') {
+    return (
+      <group name="outfit-tank">
+        {/* 메인 상체 */}
+        <mesh position={[0, 1.15 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.2 * s, 0.18 * s, 0.45 * s, 24]} />
+          <meshStandardMaterial 
+            color={color} 
+            roughness={0.6}
+            metalness={0.1}
+          />
+        </mesh>
+        {/* 넓은 어깨 스트랩 (왼쪽) */}
+        <mesh position={[-0.15 * s, 1.35 * s, 0]} rotation={[0, 0, 0.2]} castShadow>
+          <boxGeometry args={[0.05 * s, 0.25 * s, 0.15 * s]} />
+          <meshStandardMaterial color={color} roughness={0.6} />
+        </mesh>
+        {/* 넓은 어깨 스트랩 (오른쪽) */}
+        <mesh position={[0.15 * s, 1.35 * s, 0]} rotation={[0, 0, -0.2]} castShadow>
+          <boxGeometry args={[0.05 * s, 0.25 * s, 0.15 * s]} />
+          <meshStandardMaterial color={color} roughness={0.6} />
+        </mesh>
+        {/* 암홀 디테일 */}
+        <mesh position={[-0.2 * s, 1.2 * s, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <torusGeometry args={[0.08 * s, 0.008 * s, 8, 16, Math.PI]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        <mesh position={[0.2 * s, 1.2 * s, 0]} rotation={[Math.PI / 2, 0, Math.PI]} castShadow>
+          <torusGeometry args={[0.08 * s, 0.008 * s, 8, 16, Math.PI]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+      </group>
+    )
+  }
+
+  if (type === 'suit') {
+    return (
+      <group name="outfit-suit">
+        {/* 메인 수트 재킷 */}
+        <mesh position={[0, 1.1 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.24 * s, 0.2 * s, 0.55 * s, 24]} />
+          <meshStandardMaterial 
+            color={color} 
+            roughness={0.4}
+            metalness={0.3}
+          />
+        </mesh>
+        {/* 왼쪽 소매 */}
+        <mesh position={[-0.32 * s, 1.08 * s, 0]} rotation={[0, 0, 0.25]} castShadow>
+          <cylinderGeometry args={[0.065 * s, 0.08 * s, 0.52 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.4} metalness={0.3} />
+        </mesh>
+        {/* 오른쪽 소매 */}
+        <mesh position={[0.32 * s, 1.08 * s, 0]} rotation={[0, 0, -0.25]} castShadow>
+          <cylinderGeometry args={[0.065 * s, 0.08 * s, 0.52 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.4} metalness={0.3} />
+        </mesh>
+        {/* 왼쪽 라펠 (더 정교하게) */}
+        <mesh position={[-0.08 * s, 1.32 * s, 0.13 * s]} rotation={[0.4, 0.25, 0.05]} castShadow>
+          <boxGeometry args={[0.09 * s, 0.13 * s, 0.02 * s]} />
+          <meshStandardMaterial color={color} roughness={0.35} metalness={0.35} />
+        </mesh>
+        {/* 오른쪽 라펠 */}
+        <mesh position={[0.08 * s, 1.32 * s, 0.13 * s]} rotation={[0.4, -0.25, -0.05]} castShadow>
+          <boxGeometry args={[0.09 * s, 0.13 * s, 0.02 * s]} />
+          <meshStandardMaterial color={color} roughness={0.35} metalness={0.35} />
+        </mesh>
+        {/* 버튼 (위) */}
+        <mesh position={[0.03 * s, 1.25 * s, 0.215 * s]} castShadow>
+          <cylinderGeometry args={[0.012 * s, 0.012 * s, 0.008 * s, 16]} />
+          <meshStandardMaterial color="#1F2937" metalness={0.8} roughness={0.2} />
+        </mesh>
+        {/* 버튼 (중) */}
+        <mesh position={[0.03 * s, 1.15 * s, 0.215 * s]} castShadow>
+          <cylinderGeometry args={[0.012 * s, 0.012 * s, 0.008 * s, 16]} />
+          <meshStandardMaterial color="#1F2937" metalness={0.8} roughness={0.2} />
+        </mesh>
+        {/* 버튼 (아래) */}
+        <mesh position={[0.03 * s, 1.05 * s, 0.215 * s]} castShadow>
+          <cylinderGeometry args={[0.012 * s, 0.012 * s, 0.008 * s, 16]} />
+          <meshStandardMaterial color="#1F2937" metalness={0.8} roughness={0.2} />
+        </mesh>
+        {/* 가슴 포켓 (왼쪽) */}
+        <mesh position={[-0.1 * s, 1.25 * s, 0.21 * s]} castShadow>
+          <boxGeometry args={[0.05 * s, 0.06 * s, 0.01 * s]} />
+          <meshStandardMaterial color={color} roughness={0.5} />
+        </mesh>
+        {/* 포켓 스퀘어 */}
+        <mesh position={[-0.1 * s, 1.28 * s, 0.215 * s]} castShadow>
+          <boxGeometry args={[0.035 * s, 0.015 * s, 0.005 * s]} />
+          <meshStandardMaterial color="#FFFFFF" roughness={0.3} />
+        </mesh>
+        {/* 하단 포켓 (왼쪽) */}
+        <mesh position={[-0.13 * s, 0.95 * s, 0.205 * s]} castShadow>
+          <boxGeometry args={[0.08 * s, 0.1 * s, 0.01 * s]} />
+          <meshStandardMaterial color={color} roughness={0.45} />
+        </mesh>
+        {/* 하단 포켓 (오른쪽) */}
+        <mesh position={[0.13 * s, 0.95 * s, 0.205 * s]} castShadow>
+          <boxGeometry args={[0.08 * s, 0.1 * s, 0.01 * s]} />
+          <meshStandardMaterial color={color} roughness={0.45} />
+        </mesh>
+        {/* 커프스 버튼 (왼쪽) */}
+        <mesh position={[-0.32 * s, 0.84 * s, 0.065 * s]} rotation={[0, 0, 0.25]} castShadow>
+          <cylinderGeometry args={[0.008 * s, 0.008 * s, 0.006 * s, 12]} />
+          <meshStandardMaterial color="#1F2937" metalness={0.7} roughness={0.3} />
+        </mesh>
+        {/* 커프스 버튼 (오른쪽) */}
+        <mesh position={[0.32 * s, 0.84 * s, 0.065 * s]} rotation={[0, 0, -0.25]} castShadow>
+          <cylinderGeometry args={[0.008 * s, 0.008 * s, 0.006 * s, 12]} />
+          <meshStandardMaterial color="#1F2937" metalness={0.7} roughness={0.3} />
+        </mesh>
+        {/* 칼라 */}
+        <mesh position={[0, 1.37 * s, 0.06 * s]} rotation={[0.6, 0, 0]} castShadow>
+          <boxGeometry args={[0.2 * s, 0.08 * s, 0.025 * s]} />
+          <meshStandardMaterial color={color} roughness={0.35} metalness={0.35} />
+        </mesh>
+      </group>
+    )
+  }
+
+  return null
 }
 
-function Scene({ skeletonType, skinColor, outfitConfig, accessories = [] }: CreatorSceneProps) {
+// 의상 하의 컴포넌트
+function OutfitBottom({ type, color, scale }: { type: string; color: string; scale: number }) {
+  if (type === 'none') return null
+  const s = scale
+
+  if (type === 'pants') {
+    return (
+      <group name="outfit-pants">
+        {/* 허리밴드 */}
+        <mesh position={[0, 0.82 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.2 * s, 0.18 * s, 0.12 * s, 24]} />
+          <meshStandardMaterial 
+            color={color} 
+            roughness={0.7}
+            metalness={0.1}
+          />
+        </mesh>
+        {/* 왼쪽 다리 */}
+        <mesh position={[-0.1 * s, 0.45 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.085 * s, 0.075 * s, 0.62 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        {/* 왼쪽 무릎 주름 디테일 */}
+        <mesh position={[-0.1 * s, 0.5 * s, 0.08 * s]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <torusGeometry args={[0.085 * s, 0.005 * s, 8, 16]} />
+          <meshStandardMaterial color={color} roughness={0.85} />
+        </mesh>
+        {/* 왼쪽 밑단 */}
+        <mesh position={[-0.1 * s, 0.145 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.075 * s, 0.075 * s, 0.02 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.75} />
+        </mesh>
+        {/* 오른쪽 다리 */}
+        <mesh position={[0.1 * s, 0.45 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.085 * s, 0.075 * s, 0.62 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        {/* 오른쪽 무릎 주름 디테일 */}
+        <mesh position={[0.1 * s, 0.5 * s, 0.08 * s]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <torusGeometry args={[0.085 * s, 0.005 * s, 8, 16]} />
+          <meshStandardMaterial color={color} roughness={0.85} />
+        </mesh>
+        {/* 오른쪽 밑단 */}
+        <mesh position={[0.1 * s, 0.145 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.075 * s, 0.075 * s, 0.02 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.75} />
+        </mesh>
+        {/* 앞 주머니 (왼쪽) */}
+        <mesh position={[-0.13 * s, 0.75 * s, 0.175 * s]} rotation={[0.1, 0.2, 0]} castShadow>
+          <boxGeometry args={[0.05 * s, 0.06 * s, 0.01 * s]} />
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </mesh>
+        {/* 앞 주머니 (오른쪽) */}
+        <mesh position={[0.13 * s, 0.75 * s, 0.175 * s]} rotation={[0.1, -0.2, 0]} castShadow>
+          <boxGeometry args={[0.05 * s, 0.06 * s, 0.01 * s]} />
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </mesh>
+        {/* 벨트 루프 (앞 왼쪽) */}
+        <mesh position={[-0.08 * s, 0.88 * s, 0.18 * s]} castShadow>
+          <boxGeometry args={[0.015 * s, 0.04 * s, 0.01 * s]} />
+          <meshStandardMaterial color={color} roughness={0.75} />
+        </mesh>
+        {/* 벨트 루프 (앞 오른쪽) */}
+        <mesh position={[0.08 * s, 0.88 * s, 0.18 * s]} castShadow>
+          <boxGeometry args={[0.015 * s, 0.04 * s, 0.01 * s]} />
+          <meshStandardMaterial color={color} roughness={0.75} />
+        </mesh>
+        {/* 지퍼/버튼 */}
+        <mesh position={[0, 0.82 * s, 0.185 * s]} castShadow>
+          <cylinderGeometry args={[0.008 * s, 0.008 * s, 0.008 * s, 12]} />
+          <meshStandardMaterial color="#333333" metalness={0.7} roughness={0.3} />
+        </mesh>
+      </group>
+    )
+  }
+
+  if (type === 'shorts') {
+    return (
+      <group name="outfit-shorts">
+        {/* 허리밴드 */}
+        <mesh position={[0, 0.82 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.2 * s, 0.22 * s, 0.12 * s, 24]} />
+          <meshStandardMaterial 
+            color={color} 
+            roughness={0.7}
+            metalness={0.05}
+          />
+        </mesh>
+        {/* 왼쪽 반바지 다리 */}
+        <mesh position={[-0.11 * s, 0.65 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.1 * s, 0.095 * s, 0.26 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        {/* 왼쪽 밑단 */}
+        <mesh position={[-0.11 * s, 0.525 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.095 * s, 0.095 * s, 0.015 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </mesh>
+        {/* 오른쪽 반바지 다리 */}
+        <mesh position={[0.11 * s, 0.65 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.1 * s, 0.095 * s, 0.26 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        {/* 오른쪽 밑단 */}
+        <mesh position={[0.11 * s, 0.525 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.095 * s, 0.095 * s, 0.015 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </mesh>
+        {/* 주머니 (왼쪽) */}
+        <mesh position={[-0.16 * s, 0.75 * s, 0.19 * s]} rotation={[0.1, 0.3, 0]} castShadow>
+          <boxGeometry args={[0.055 * s, 0.07 * s, 0.01 * s]} />
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </mesh>
+        {/* 주머니 (오른쪽) */}
+        <mesh position={[0.16 * s, 0.75 * s, 0.19 * s]} rotation={[0.1, -0.3, 0]} castShadow>
+          <boxGeometry args={[0.055 * s, 0.07 * s, 0.01 * s]} />
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </mesh>
+      </group>
+    )
+  }
+
+  if (type === 'skirt') {
+    return (
+      <group name="outfit-skirt">
+        {/* 메인 스커트 (플레어 효과) */}
+        <mesh position={[0, 0.7 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.27 * s, 0.16 * s, 0.37 * s, 24]} />
+          <meshStandardMaterial 
+            color={color} 
+            roughness={0.6}
+            metalness={0.05}
+          />
+        </mesh>
+        {/* 허리밴드 */}
+        <mesh position={[0, 0.88 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.16 * s, 0.16 * s, 0.03 * s, 24]} />
+          <meshStandardMaterial color={color} roughness={0.5} metalness={0.1} />
+        </mesh>
+        {/* 밑단 디테일 */}
+        <mesh position={[0, 0.515 * s, 0]} castShadow>
+          <torusGeometry args={[0.27 * s, 0.008 * s, 12, 24]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        {/* 주름 디테일 (8개) */}
+        {Array.from({ length: 8 }).map((_, i) => {
+          const angle = (i / 8) * Math.PI * 2
+          const x = Math.sin(angle) * 0.2 * s
+          const z = Math.cos(angle) * 0.2 * s
+          return (
+            <mesh key={i} position={[x, 0.7 * s, z]} rotation={[0, -angle, 0]} castShadow>
+              <boxGeometry args={[0.005 * s, 0.35 * s, 0.002 * s]} />
+              <meshStandardMaterial color={color} roughness={0.75} />
+            </mesh>
+          )
+        })}
+      </group>
+    )
+  }
+
+  if (type === 'longSkirt') {
+    return (
+      <group name="outfit-longskirt">
+        {/* 메인 롱스커트 */}
+        <mesh position={[0, 0.55 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.3 * s, 0.16 * s, 0.68 * s, 24]} />
+          <meshStandardMaterial 
+            color={color} 
+            roughness={0.65}
+            metalness={0.05}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+        {/* 허리밴드 */}
+        <mesh position={[0, 0.88 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.16 * s, 0.16 * s, 0.04 * s, 24]} />
+          <meshStandardMaterial color={color} roughness={0.5} metalness={0.1} />
+        </mesh>
+        {/* 밑단 디테일 */}
+        <mesh position={[0, 0.22 * s, 0]} castShadow>
+          <torusGeometry args={[0.3 * s, 0.01 * s, 12, 24]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        {/* 세로 주름 라인 (12개) */}
+        {Array.from({ length: 12 }).map((_, i) => {
+          const angle = (i / 12) * Math.PI * 2
+          const x = Math.sin(angle) * 0.2 * s
+          const z = Math.cos(angle) * 0.2 * s
+          return (
+            <mesh key={i} position={[x, 0.55 * s, z]} rotation={[0, -angle, 0]} castShadow>
+              <boxGeometry args={[0.004 * s, 0.65 * s, 0.002 * s]} />
+              <meshStandardMaterial color={color} roughness={0.8} />
+            </mesh>
+          )
+        })}
+        {/* 벨트/리본 장식 */}
+        <mesh position={[0, 0.88 * s, 0.17 * s]} castShadow>
+          <boxGeometry args={[0.18 * s, 0.025 * s, 0.02 * s]} />
+          <meshStandardMaterial color={color} roughness={0.4} metalness={0.2} />
+        </mesh>
+      </group>
+    )
+  }
+
+  return null
+}
+
+// 의상 신발 컴포넌트
+function OutfitShoes({ type, color, scale }: { type: string; color: string; scale: number }) {
+  if (type === 'none') return null
+  const s = scale
+
+  if (type === 'sneakers') {
+    return (
+      <group name="outfit-sneakers">
+        {/* 왼쪽 운동화 */}
+        {/* 밑창 */}
+        <mesh position={[-0.12 * s, 0.025 * s, 0.03 * s]} castShadow>
+          <boxGeometry args={[0.11 * s, 0.03 * s, 0.22 * s]} />
+          <meshStandardMaterial color="#FFFFFF" roughness={0.6} metalness={0.1} />
+        </mesh>
+        {/* 미드솔 */}
+        <mesh position={[-0.12 * s, 0.045 * s, 0.02 * s]} castShadow>
+          <boxGeometry args={[0.105 * s, 0.01 * s, 0.2 * s]} />
+          <meshStandardMaterial color="#E0E0E0" roughness={0.5} />
+        </mesh>
+        {/* 갑피 (어퍼) */}
+        <mesh position={[-0.12 * s, 0.07 * s, 0.02 * s]} castShadow>
+          <boxGeometry args={[0.1 * s, 0.06 * s, 0.19 * s]} />
+          <meshStandardMaterial color={color} roughness={0.6} metalness={0.05} />
+        </mesh>
+        {/* 설포 (텅) */}
+        <mesh position={[-0.12 * s, 0.08 * s, 0.08 * s]} rotation={[0.3, 0, 0]} castShadow>
+          <boxGeometry args={[0.06 * s, 0.05 * s, 0.01 * s]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        {/* 끈 (왼쪽) */}
+        <mesh position={[-0.14 * s, 0.075 * s, 0.05 * s]} rotation={[0.2, 0.3, 0]} castShadow>
+          <cylinderGeometry args={[0.004 * s, 0.004 * s, 0.04 * s, 8]} />
+          <meshStandardMaterial color="#333333" roughness={0.8} />
+        </mesh>
+        {/* 끈 (오른쪽) */}
+        <mesh position={[-0.1 * s, 0.075 * s, 0.05 * s]} rotation={[0.2, -0.3, 0]} castShadow>
+          <cylinderGeometry args={[0.004 * s, 0.004 * s, 0.04 * s, 8]} />
+          <meshStandardMaterial color="#333333" roughness={0.8} />
+        </mesh>
+        {/* 로고 스우시 */}
+        <mesh position={[-0.15 * s, 0.07 * s, 0.03 * s]} rotation={[0, Math.PI / 2, 0]} castShadow>
+          <boxGeometry args={[0.03 * s, 0.015 * s, 0.002 * s]} />
+          <meshStandardMaterial color="#FFFFFF" roughness={0.5} metalness={0.2} />
+        </mesh>
+
+        {/* 오른쪽 운동화 (미러) */}
+        <mesh position={[0.12 * s, 0.025 * s, 0.03 * s]} castShadow>
+          <boxGeometry args={[0.11 * s, 0.03 * s, 0.22 * s]} />
+          <meshStandardMaterial color="#FFFFFF" roughness={0.6} metalness={0.1} />
+        </mesh>
+        <mesh position={[0.12 * s, 0.045 * s, 0.02 * s]} castShadow>
+          <boxGeometry args={[0.105 * s, 0.01 * s, 0.2 * s]} />
+          <meshStandardMaterial color="#E0E0E0" roughness={0.5} />
+        </mesh>
+        <mesh position={[0.12 * s, 0.07 * s, 0.02 * s]} castShadow>
+          <boxGeometry args={[0.1 * s, 0.06 * s, 0.19 * s]} />
+          <meshStandardMaterial color={color} roughness={0.6} metalness={0.05} />
+        </mesh>
+        <mesh position={[0.12 * s, 0.08 * s, 0.08 * s]} rotation={[0.3, 0, 0]} castShadow>
+          <boxGeometry args={[0.06 * s, 0.05 * s, 0.01 * s]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        <mesh position={[0.14 * s, 0.075 * s, 0.05 * s]} rotation={[0.2, -0.3, 0]} castShadow>
+          <cylinderGeometry args={[0.004 * s, 0.004 * s, 0.04 * s, 8]} />
+          <meshStandardMaterial color="#333333" roughness={0.8} />
+        </mesh>
+        <mesh position={[0.1 * s, 0.075 * s, 0.05 * s]} rotation={[0.2, 0.3, 0]} castShadow>
+          <cylinderGeometry args={[0.004 * s, 0.004 * s, 0.04 * s, 8]} />
+          <meshStandardMaterial color="#333333" roughness={0.8} />
+        </mesh>
+        <mesh position={[0.15 * s, 0.07 * s, 0.03 * s]} rotation={[0, -Math.PI / 2, 0]} castShadow>
+          <boxGeometry args={[0.03 * s, 0.015 * s, 0.002 * s]} />
+          <meshStandardMaterial color="#FFFFFF" roughness={0.5} metalness={0.2} />
+        </mesh>
+      </group>
+    )
+  }
+
+  if (type === 'boots') {
+    return (
+      <group name="outfit-boots">
+        {/* 왼쪽 부츠 */}
+        {/* 샤프트 (긴 부분) */}
+        <mesh position={[-0.12 * s, 0.16 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.068 * s, 0.082 * s, 0.3 * s, 16]} />
+          <meshStandardMaterial 
+            color={color} 
+            roughness={0.5}
+            metalness={0.15}
+          />
+        </mesh>
+        {/* 가죽 주름 디테일 (상단) */}
+        <mesh position={[-0.12 * s, 0.25 * s, 0.068 * s]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <torusGeometry args={[0.068 * s, 0.004 * s, 8, 16]} />
+          <meshStandardMaterial color={color} roughness={0.6} />
+        </mesh>
+        {/* 가죽 주름 디테일 (하단) */}
+        <mesh position={[-0.12 * s, 0.12 * s, 0.08 * s]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <torusGeometry args={[0.075 * s, 0.004 * s, 8, 16]} />
+          <meshStandardMaterial color={color} roughness={0.6} />
+        </mesh>
+        {/* 발등 부분 */}
+        <mesh position={[-0.12 * s, 0.05 * s, 0.05 * s]} castShadow>
+          <boxGeometry args={[0.105 * s, 0.07 * s, 0.2 * s]} />
+          <meshStandardMaterial color={color} roughness={0.5} metalness={0.15} />
+        </mesh>
+        {/* 밑창 */}
+        <mesh position={[-0.12 * s, 0.015 * s, 0.05 * s]} castShadow>
+          <boxGeometry args={[0.11 * s, 0.02 * s, 0.21 * s]} />
+          <meshStandardMaterial color="#2C2C2C" roughness={0.8} metalness={0.1} />
+        </mesh>
+        {/* 지퍼 라인 */}
+        <mesh position={[-0.16 * s, 0.16 * s, 0]} castShadow>
+          <boxGeometry args={[0.005 * s, 0.28 * s, 0.008 * s]} />
+          <meshStandardMaterial color="#A0A0A0" metalness={0.7} roughness={0.3} />
+        </mesh>
+        {/* 지퍼 풀러 */}
+        <mesh position={[-0.16 * s, 0.28 * s, 0]} castShadow>
+          <boxGeometry args={[0.008 * s, 0.015 * s, 0.01 * s]} />
+          <meshStandardMaterial color="#C0C0C0" metalness={0.8} roughness={0.2} />
+        </mesh>
+        {/* 힐 */}
+        <mesh position={[-0.12 * s, 0.025 * s, -0.08 * s]} castShadow>
+          <boxGeometry args={[0.08 * s, 0.04 * s, 0.06 * s]} />
+          <meshStandardMaterial color={color} roughness={0.4} metalness={0.2} />
+        </mesh>
+
+        {/* 오른쪽 부츠 (미러) */}
+        <mesh position={[0.12 * s, 0.16 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.068 * s, 0.082 * s, 0.3 * s, 16]} />
+          <meshStandardMaterial color={color} roughness={0.5} metalness={0.15} />
+        </mesh>
+        <mesh position={[0.12 * s, 0.25 * s, 0.068 * s]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <torusGeometry args={[0.068 * s, 0.004 * s, 8, 16]} />
+          <meshStandardMaterial color={color} roughness={0.6} />
+        </mesh>
+        <mesh position={[0.12 * s, 0.12 * s, 0.08 * s]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <torusGeometry args={[0.075 * s, 0.004 * s, 8, 16]} />
+          <meshStandardMaterial color={color} roughness={0.6} />
+        </mesh>
+        <mesh position={[0.12 * s, 0.05 * s, 0.05 * s]} castShadow>
+          <boxGeometry args={[0.105 * s, 0.07 * s, 0.2 * s]} />
+          <meshStandardMaterial color={color} roughness={0.5} metalness={0.15} />
+        </mesh>
+        <mesh position={[0.12 * s, 0.015 * s, 0.05 * s]} castShadow>
+          <boxGeometry args={[0.11 * s, 0.02 * s, 0.21 * s]} />
+          <meshStandardMaterial color="#2C2C2C" roughness={0.8} metalness={0.1} />
+        </mesh>
+        <mesh position={[0.16 * s, 0.16 * s, 0]} castShadow>
+          <boxGeometry args={[0.005 * s, 0.28 * s, 0.008 * s]} />
+          <meshStandardMaterial color="#A0A0A0" metalness={0.7} roughness={0.3} />
+        </mesh>
+        <mesh position={[0.16 * s, 0.28 * s, 0]} castShadow>
+          <boxGeometry args={[0.008 * s, 0.015 * s, 0.01 * s]} />
+          <meshStandardMaterial color="#C0C0C0" metalness={0.8} roughness={0.2} />
+        </mesh>
+        <mesh position={[0.12 * s, 0.025 * s, -0.08 * s]} castShadow>
+          <boxGeometry args={[0.08 * s, 0.04 * s, 0.06 * s]} />
+          <meshStandardMaterial color={color} roughness={0.4} metalness={0.2} />
+        </mesh>
+      </group>
+    )
+  }
+
+  if (type === 'sandals') {
+    return (
+      <group name="outfit-sandals">
+        {/* 왼쪽 샌들 */}
+        {/* 밑창 */}
+        <mesh position={[-0.12 * s, 0.015 * s, 0.02 * s]} castShadow>
+          <boxGeometry args={[0.095 * s, 0.02 * s, 0.19 * s]} />
+          <meshStandardMaterial color={color} roughness={0.7} metalness={0.05} />
+        </mesh>
+        {/* 앞 스트랩 */}
+        <mesh position={[-0.12 * s, 0.03 * s, 0.05 * s]} castShadow>
+          <boxGeometry args={[0.09 * s, 0.01 * s, 0.03 * s]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        {/* 발목 스트랩 */}
+        <mesh position={[-0.12 * s, 0.04 * s, -0.04 * s]} castShadow>
+          <boxGeometry args={[0.09 * s, 0.01 * s, 0.02 * s]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        {/* 버클 장식 */}
+        <mesh position={[-0.16 * s, 0.04 * s, -0.04 * s]} castShadow>
+          <boxGeometry args={[0.012 * s, 0.015 * s, 0.015 * s]} />
+          <meshStandardMaterial color="#C0A070" metalness={0.7} roughness={0.3} />
+        </mesh>
+
+        {/* 오른쪽 샌들 */}
+        <mesh position={[0.12 * s, 0.015 * s, 0.02 * s]} castShadow>
+          <boxGeometry args={[0.095 * s, 0.02 * s, 0.19 * s]} />
+          <meshStandardMaterial color={color} roughness={0.7} metalness={0.05} />
+        </mesh>
+        <mesh position={[0.12 * s, 0.03 * s, 0.05 * s]} castShadow>
+          <boxGeometry args={[0.09 * s, 0.01 * s, 0.03 * s]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        <mesh position={[0.12 * s, 0.04 * s, -0.04 * s]} castShadow>
+          <boxGeometry args={[0.09 * s, 0.01 * s, 0.02 * s]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        <mesh position={[0.16 * s, 0.04 * s, -0.04 * s]} castShadow>
+          <boxGeometry args={[0.012 * s, 0.015 * s, 0.015 * s]} />
+          <meshStandardMaterial color="#C0A070" metalness={0.7} roughness={0.3} />
+        </mesh>
+      </group>
+    )
+  }
+
+  if (type === 'formal') {
+    return (
+      <group name="outfit-formal">
+        {/* 왼쪽 구두 */}
+        {/* 밑창 */}
+        <mesh position={[-0.12 * s, 0.015 * s, 0.02 * s]} castShadow>
+          <boxGeometry args={[0.085 * s, 0.02 * s, 0.2 * s]} />
+          <meshStandardMaterial color="#1A1A1A" roughness={0.7} metalness={0.2} />
+        </mesh>
+        {/* 갑피 (상단) */}
+        <mesh position={[-0.12 * s, 0.06 * s, 0.02 * s]} castShadow>
+          <boxGeometry args={[0.08 * s, 0.07 * s, 0.19 * s]} />
+          <meshStandardMaterial 
+            color={color} 
+            roughness={0.3}
+            metalness={0.4}
+          />
+        </mesh>
+        {/* 토캡 (앞코) */}
+        <mesh position={[-0.12 * s, 0.05 * s, 0.11 * s]} castShadow>
+          <sphereGeometry args={[0.045 * s, 12, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshStandardMaterial color={color} roughness={0.25} metalness={0.5} />
+        </mesh>
+        {/* 힐 */}
+        <mesh position={[-0.12 * s, 0.04 * s, -0.07 * s]} castShadow>
+          <boxGeometry args={[0.07 * s, 0.055 * s, 0.055 * s]} />
+          <meshStandardMaterial color={color} roughness={0.35} metalness={0.4} />
+        </mesh>
+        {/* 레이싱 (끈) 디테일 */}
+        <mesh position={[-0.12 * s, 0.075 * s, 0.05 * s]} rotation={[0.3, 0, 0]} castShadow>
+          <cylinderGeometry args={[0.003 * s, 0.003 * s, 0.05 * s, 8]} />
+          <meshStandardMaterial color="#2C2C2C" roughness={0.8} />
+        </mesh>
+        {/* 광택 효과 (하이라이트) */}
+        <mesh position={[-0.12 * s, 0.08 * s, 0.05 * s]} castShadow>
+          <boxGeometry args={[0.03 * s, 0.015 * s, 0.06 * s]} />
+          <meshStandardMaterial 
+            color={color}
+            roughness={0.15}
+            metalness={0.6}
+            emissive={color}
+            emissiveIntensity={0.1}
+          />
+        </mesh>
+
+        {/* 오른쪽 구두 (미러) */}
+        <mesh position={[0.12 * s, 0.015 * s, 0.02 * s]} castShadow>
+          <boxGeometry args={[0.085 * s, 0.02 * s, 0.2 * s]} />
+          <meshStandardMaterial color="#1A1A1A" roughness={0.7} metalness={0.2} />
+        </mesh>
+        <mesh position={[0.12 * s, 0.06 * s, 0.02 * s]} castShadow>
+          <boxGeometry args={[0.08 * s, 0.07 * s, 0.19 * s]} />
+          <meshStandardMaterial color={color} roughness={0.3} metalness={0.4} />
+        </mesh>
+        <mesh position={[0.12 * s, 0.05 * s, 0.11 * s]} castShadow>
+          <sphereGeometry args={[0.045 * s, 12, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshStandardMaterial color={color} roughness={0.25} metalness={0.5} />
+        </mesh>
+        <mesh position={[0.12 * s, 0.04 * s, -0.07 * s]} castShadow>
+          <boxGeometry args={[0.07 * s, 0.055 * s, 0.055 * s]} />
+          <meshStandardMaterial color={color} roughness={0.35} metalness={0.4} />
+        </mesh>
+        <mesh position={[0.12 * s, 0.075 * s, 0.05 * s]} rotation={[0.3, 0, 0]} castShadow>
+          <cylinderGeometry args={[0.003 * s, 0.003 * s, 0.05 * s, 8]} />
+          <meshStandardMaterial color="#2C2C2C" roughness={0.8} />
+        </mesh>
+        <mesh position={[0.12 * s, 0.08 * s, 0.05 * s]} castShadow>
+          <boxGeometry args={[0.03 * s, 0.015 * s, 0.06 * s]} />
+          <meshStandardMaterial 
+            color={color}
+            roughness={0.15}
+            metalness={0.6}
+            emissive={color}
+            emissiveIntensity={0.1}
+          />
+        </mesh>
+      </group>
+    )
+  }
+
+  return null
+}
+
+// 악세서리 컴포넌트
+function Accessory({ type, color, scale }: { type: string; color: string; scale: number }) {
+  const s = scale
+
+  if (type === 'hat') {
+    return (
+      <group name="accessory-hat">
+        <mesh position={[0, 1.8 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.18 * s, 0.2 * s, 0.15 * s, 16]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+        <mesh position={[0, 1.72 * s, 0]} castShadow>
+          <cylinderGeometry args={[0.28 * s, 0.28 * s, 0.02 * s, 16]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+      </group>
+    )
+  }
+
+  if (type === 'glasses') {
+    return (
+      <group name="accessory-glasses">
+        <mesh position={[-0.08 * s, 1.62 * s, 0.13 * s]} castShadow>
+          <ringGeometry args={[0.04 * s, 0.05 * s, 16]} />
+          <meshStandardMaterial color={color} side={THREE.DoubleSide} />
+        </mesh>
+        <mesh position={[0.08 * s, 1.62 * s, 0.13 * s]} castShadow>
+          <ringGeometry args={[0.04 * s, 0.05 * s, 16]} />
+          <meshStandardMaterial color={color} side={THREE.DoubleSide} />
+        </mesh>
+        <mesh position={[0, 1.62 * s, 0.13 * s]} castShadow>
+          <boxGeometry args={[0.06 * s, 0.01 * s, 0.01 * s]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+      </group>
+    )
+  }
+
+  if (type === 'backpack') {
+    return (
+      <group name="accessory-backpack">
+        <mesh position={[0, 1.1 * s, -0.2 * s]} castShadow>
+          <boxGeometry args={[0.25 * s, 0.35 * s, 0.12 * s]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+        <mesh position={[-0.1 * s, 1.2 * s, -0.1 * s]} rotation={[0.3, 0, 0]} castShadow>
+          <boxGeometry args={[0.03 * s, 0.25 * s, 0.02 * s]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+        <mesh position={[0.1 * s, 1.2 * s, -0.1 * s]} rotation={[0.3, 0, 0]} castShadow>
+          <boxGeometry args={[0.03 * s, 0.25 * s, 0.02 * s]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+      </group>
+    )
+  }
+
+  if (type === 'watch') {
+    return (
+      <group name="accessory-watch">
+        <mesh position={[-0.38 * s, 0.85 * s, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+          <cylinderGeometry args={[0.025 * s, 0.025 * s, 0.015 * s, 16]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+        <mesh position={[-0.38 * s, 0.85 * s, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <torusGeometry args={[0.035 * s, 0.008 * s, 8, 24]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+      </group>
+    )
+  }
+
+  if (type === 'necklace') {
+    return (
+      <group name="accessory-necklace">
+        <mesh position={[0, 1.4 * s, 0.12 * s]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <torusGeometry args={[0.12 * s, 0.01 * s, 8, 24]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+        <mesh position={[0, 1.28 * s, 0.14 * s]} castShadow>
+          <sphereGeometry args={[0.025 * s, 12, 12]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+      </group>
+    )
+  }
+
+  if (type === 'earrings') {
+    return (
+      <group name="accessory-earrings">
+        <mesh position={[-0.14 * s, 1.58 * s, 0]} castShadow>
+          <sphereGeometry args={[0.015 * s, 8, 8]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+        <mesh position={[0.14 * s, 1.58 * s, 0]} castShadow>
+          <sphereGeometry args={[0.015 * s, 8, 8]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+      </group>
+    )
+  }
+
+  if (type === 'scarf') {
+    return (
+      <group name="accessory-scarf">
+        <mesh position={[0, 1.42 * s, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <torusGeometry args={[0.14 * s, 0.04 * s, 8, 24]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+        <mesh position={[0.08 * s, 1.2 * s, 0.14 * s]} castShadow>
+          <boxGeometry args={[0.08 * s, 0.35 * s, 0.02 * s]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+      </group>
+    )
+  }
+
+  if (type === 'gloves') {
+    return (
+      <group name="accessory-gloves">
+        <mesh position={[-0.4 * s, 0.78 * s, 0]} castShadow>
+          <sphereGeometry args={[0.055 * s, 12, 12]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+        <mesh position={[0.4 * s, 0.78 * s, 0]} castShadow>
+          <sphereGeometry args={[0.055 * s, 12, 12]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+      </group>
+    )
+  }
+
+  return null
+}
+
+function Scene({ skeletonType, skinColor, outfitConfig, accessories = [], externalModelUrl, externalModelType }: CreatorSceneProps) {
   const scale = SKELETON_SCALES[skeletonType]
 
   // 스켈레톤 타입에 따른 카메라 타겟
@@ -708,8 +1627,31 @@ function Scene({ skeletonType, skinColor, outfitConfig, accessories = [] }: Crea
         skinColor={skinColor}
       />
 
-      {/* 의상 및 악세서리는 현재 config 기반으로 시각적 표시 (추후 구현) */}
-      {/* outfitConfig와 accessories는 향후 모델 렌더링에 사용 예정 */}
+      {/* 외부 3D 모델 */}
+      {externalModelUrl && (
+        <Suspense fallback={null}>
+          <ModelLoader
+            url={externalModelUrl}
+            fileType={externalModelType || undefined}
+            position={[0, 0, 0]}
+            scale={1}
+          />
+        </Suspense>
+      )}
+
+      {/* 의상 (인간형만, 외부 모델 없을 때만) */}
+      {outfitConfig && !externalModelUrl && (
+        <group name="outfit">
+          <OutfitTop type={outfitConfig.top} color={outfitConfig.topColor} scale={scale} />
+          <OutfitBottom type={outfitConfig.bottom} color={outfitConfig.bottomColor} scale={scale} />
+          <OutfitShoes type={outfitConfig.shoes} color={outfitConfig.shoesColor} scale={scale} />
+        </group>
+      )}
+
+      {/* 악세서리 */}
+      {accessories.map((acc, index) => (
+        <Accessory key={`${acc.type}-${index}`} type={acc.type} color={acc.color} scale={scale} />
+      ))}
 
       {/* 바닥 */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
