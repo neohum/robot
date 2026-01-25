@@ -4,6 +4,7 @@ import { useState, Suspense, useEffect } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
+import ModelLibrary from '@/components/ModelLibrary'
 
 const CreatorScene = dynamic(
   () => import('@/components/Creator/CreatorScene'),
@@ -16,29 +17,30 @@ export type SkeletonType = 'humanSmall' | 'humanMedium' | 'humanLarge' | 'quadru
 // 탭 타입
 type TabType = 'skin' | 'outfit' | 'accessory'
 
-// 의상 타입
-export type OutfitTopType = 'none' | 'tshirt' | 'jacket' | 'hoodie' | 'tank' | 'suit'
-export type OutfitBottomType = 'none' | 'pants' | 'shorts' | 'skirt' | 'longSkirt'
-export type OutfitShoesType = 'none' | 'sneakers' | 'boots' | 'sandals' | 'formal'
-
-// 악세서리 타입
-export type AccessoryType = 'hat' | 'glasses' | 'backpack' | 'watch' | 'necklace' | 'earrings' | 'scarf' | 'gloves'
-
-// 의상 설정
-export interface OutfitConfig {
-  top: OutfitTopType
-  topColor: string
-  bottom: OutfitBottomType
-  bottomColor: string
-  shoes: OutfitShoesType
-  shoesColor: string
+// 선택된 모델 정보
+export interface SelectedModel {
+  url: string
+  name: string
+  position: [number, number, number]  // x, y, z
+  rotation: [number, number, number]  // x, y, z (라디안)
+  scale: number
 }
 
-// 악세서리 설정
+// 의상 설정 (라이브러리에서 선택한 모델)
+export interface OutfitConfig {
+  top?: SelectedModel
+  bottom?: SelectedModel
+  shoes?: SelectedModel
+  fullbody?: SelectedModel
+}
+
+// 악세서리 설정 (라이브러리에서 선택한 모델)
 export interface AccessoryConfig {
-  type: AccessoryType
-  color: string
-  enabled: boolean
+  hats?: SelectedModel
+  glasses?: SelectedModel
+  bags?: SelectedModel
+  jewelry?: SelectedModel
+  other?: SelectedModel
 }
 
 // 카테고리별 스켈레톤 분류
@@ -106,59 +108,22 @@ const SKIN_COLORS = [
   '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE'
 ]
 
-// 의상/악세서리 색상
-const OUTFIT_COLORS = [
-  '#FFFFFF', '#000000', '#1F2937', '#374151', '#6B7280',
-  '#EF4444', '#F97316', '#F59E0B', '#EAB308', '#84CC16',
-  '#22C55E', '#10B981', '#14B8A6', '#06B6D4', '#0EA5E9',
-  '#3B82F6', '#6366F1', '#8B5CF6', '#A855F7', '#D946EF',
-  '#EC4899', '#F43F5E', '#78350F', '#92400E', '#A16207'
-]
+// 의상 서브카테고리
+const OUTFIT_SUBCATEGORIES = [
+  { key: 'top', label: '상의', subcategory: 'tops' },
+  { key: 'bottom', label: '하의', subcategory: 'bottoms' },
+  { key: 'shoes', label: '신발', subcategory: 'shoes' },
+  { key: 'fullbody', label: '전신', subcategory: 'fullbody' },
+] as const
 
-// 의상 종류 정의
-const OUTFIT_TOP_OPTIONS: { value: OutfitTopType; label: string }[] = [
-  { value: 'none', label: '없음' },
-  { value: 'tshirt', label: '티셔츠' },
-  { value: 'jacket', label: '자켓' },
-  { value: 'hoodie', label: '후드티' },
-  { value: 'tank', label: '민소매' },
-  { value: 'suit', label: '정장' },
-]
-
-const OUTFIT_BOTTOM_OPTIONS: { value: OutfitBottomType; label: string }[] = [
-  { value: 'none', label: '없음' },
-  { value: 'pants', label: '긴바지' },
-  { value: 'shorts', label: '반바지' },
-  { value: 'skirt', label: '스커트' },
-  { value: 'longSkirt', label: '롱스커트' },
-]
-
-const OUTFIT_SHOES_OPTIONS: { value: OutfitShoesType; label: string }[] = [
-  { value: 'none', label: '없음' },
-  { value: 'sneakers', label: '운동화' },
-  { value: 'boots', label: '부츠' },
-  { value: 'sandals', label: '샌들' },
-  { value: 'formal', label: '구두' },
-]
-
-// 악세서리 종류 정의
-const ACCESSORY_OPTIONS: { value: AccessoryType; label: string; icon: string }[] = [
-  { value: 'hat', label: '모자', icon: '🎩' },
-  { value: 'glasses', label: '안경', icon: '👓' },
-  { value: 'backpack', label: '배낭', icon: '🎒' },
-  { value: 'watch', label: '시계', icon: '⌚' },
-  { value: 'necklace', label: '목걸이', icon: '📿' },
-  { value: 'earrings', label: '귀걸이', icon: '💎' },
-  { value: 'scarf', label: '스카프', icon: '🧣' },
-  { value: 'gloves', label: '장갑', icon: '🧤' },
-]
-
-// 기본 악세서리 설정
-const DEFAULT_ACCESSORIES: AccessoryConfig[] = ACCESSORY_OPTIONS.map(opt => ({
-  type: opt.value,
-  color: '#3B82F6',
-  enabled: false
-}))
+// 악세서리 서브카테고리
+const ACCESSORY_SUBCATEGORIES = [
+  { key: 'hats', label: '모자', icon: '🎩' },
+  { key: 'glasses', label: '안경', icon: '👓' },
+  { key: 'bags', label: '가방', icon: '🎒' },
+  { key: 'jewelry', label: '장신구', icon: '💎' },
+  { key: 'other', label: '기타', icon: '✨' },
+] as const
 
 export default function CreatorPage() {
   const [skeletonType, setSkeletonType] = useState<SkeletonType>('humanMedium')
@@ -166,37 +131,17 @@ export default function CreatorPage() {
   const [skinColorIndex, setSkinColorIndex] = useState(0)
   const [modelName, setModelName] = useState('내 캐릭터')
   const [isExporting, setIsExporting] = useState(false)
-  
-  // 외부 모델 URL 및 타입
-  const [externalModelUrl, setExternalModelUrl] = useState<string | null>(null)
-  const [externalModelType, setExternalModelType] = useState<string | null>(null)
 
-  // 의상 설정
-  const [outfitConfig, setOutfitConfig] = useState<OutfitConfig>({
-    top: 'tshirt',
-    topColor: '#3B82F6',
-    bottom: 'pants',
-    bottomColor: '#1F2937',
-    shoes: 'sneakers',
-    shoesColor: '#FFFFFF'
-  })
+  // 라이브러리 모달 상태
+  const [showLibrary, setShowLibrary] = useState(false)
+  const [libraryCategory, setLibraryCategory] = useState<'outfits' | 'accessories'>('outfits')
+  const [librarySubcategory, setLibrarySubcategory] = useState<string>('tops')
 
-  // 악세서리 설정
-  const [accessories, setAccessories] = useState<AccessoryConfig[]>(DEFAULT_ACCESSORIES)
+  // 의상 설정 (라이브러리에서 선택)
+  const [outfitConfig, setOutfitConfig] = useState<OutfitConfig>({})
 
-  // 악세서리 토글
-  const toggleAccessory = (type: AccessoryType) => {
-    setAccessories(prev => prev.map(acc =>
-      acc.type === type ? { ...acc, enabled: !acc.enabled } : acc
-    ))
-  }
-
-  // 악세서리 색상 변경
-  const setAccessoryColor = (type: AccessoryType, color: string) => {
-    setAccessories(prev => prev.map(acc =>
-      acc.type === type ? { ...acc, color } : acc
-    ))
-  }
+  // 악세서리 설정 (라이브러리에서 선택)
+  const [accessoryConfig, setAccessoryConfig] = useState<AccessoryConfig>({})
 
   const handleExportGLB = async () => {
     setIsExporting(true)
@@ -208,7 +153,7 @@ export default function CreatorPage() {
         skeleton: skeletonType,
         skinColor: SKIN_COLORS[skinColorIndex],
         outfit: outfitConfig,
-        accessories: accessories.filter(a => a.enabled)
+        accessories: accessoryConfig
       }
     })
     window.dispatchEvent(event)
@@ -220,60 +165,101 @@ export default function CreatorPage() {
     }, 1500)
   }
 
-  // 파일 업로드 핸들러
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+  // 라이브러리 열기
+  const openLibrary = (category: 'outfits' | 'accessories', subcategory: string) => {
+    setLibraryCategory(category)
+    setLibrarySubcategory(subcategory)
+    setShowLibrary(true)
+  }
 
-    // 파일 형식 체크 (GLB만 허용 - 텍스처가 포함되어 있음)
-    const ext = file.name.split('.').pop()?.toLowerCase()
-    if (ext !== 'glb') {
-      toast.error('GLB 파일만 지원됩니다. GLTF 파일은 GLB로 변환 후 업로드하세요.')
-      return
+  // 모델 선택 핸들러
+  const handleSelectModel = (url: string, name: string) => {
+    const defaultModel: SelectedModel = {
+      url,
+      name,
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      scale: 1
     }
 
-    // 파일 크기 체크 (20MB)
-    if (file.size > 20 * 1024 * 1024) {
-      toast.error('파일 크기는 20MB 이하여야 합니다')
-      return
+    if (libraryCategory === 'outfits') {
+      const key = OUTFIT_SUBCATEGORIES.find(s => s.subcategory === librarySubcategory)?.key
+      if (key) {
+        setOutfitConfig(prev => ({
+          ...prev,
+          [key]: defaultModel
+        }))
+      }
+    } else {
+      setAccessoryConfig(prev => ({
+        ...prev,
+        [librarySubcategory]: defaultModel
+      }))
     }
+    setShowLibrary(false)
+  }
 
-    // URL 생성 및 타입 저장
-    const url = URL.createObjectURL(file)
-    setExternalModelUrl(url)
-    setExternalModelType('glb')
-    toast.success(`${file.name} 파일이 로드되었습니다`)
+  // 의상 위치/회전/스케일 업데이트
+  const updateOutfitTransform = (
+    key: keyof OutfitConfig,
+    field: 'position' | 'rotation' | 'scale',
+    value: [number, number, number] | number
+  ) => {
+    setOutfitConfig(prev => {
+      const model = prev[key]
+      if (!model) return prev
+      return {
+        ...prev,
+        [key]: {
+          ...model,
+          [field]: value
+        }
+      }
+    })
+  }
+
+  // 악세서리 위치/회전/스케일 업데이트
+  const updateAccessoryTransform = (
+    key: keyof AccessoryConfig,
+    field: 'position' | 'rotation' | 'scale',
+    value: [number, number, number] | number
+  ) => {
+    setAccessoryConfig(prev => {
+      const model = prev[key]
+      if (!model) return prev
+      return {
+        ...prev,
+        [key]: {
+          ...model,
+          [field]: value
+        }
+      }
+    })
+  }
+
+  // 모델 제거 핸들러
+  const removeOutfit = (key: keyof OutfitConfig) => {
+    setOutfitConfig(prev => {
+      const newConfig = { ...prev }
+      delete newConfig[key]
+      return newConfig
+    })
+    toast.info('의상이 제거되었습니다')
+  }
+
+  const removeAccessory = (key: keyof AccessoryConfig) => {
+    setAccessoryConfig(prev => {
+      const newConfig = { ...prev }
+      delete newConfig[key]
+      return newConfig
+    })
+    toast.info('악세서리가 제거되었습니다')
   }
 
   const handleRandomize = () => {
     setSkinColorIndex(Math.floor(Math.random() * SKIN_COLORS.length))
-
-    // 랜덤 의상
-    const randomTop = OUTFIT_TOP_OPTIONS[Math.floor(Math.random() * OUTFIT_TOP_OPTIONS.length)].value
-    const randomBottom = OUTFIT_BOTTOM_OPTIONS[Math.floor(Math.random() * OUTFIT_BOTTOM_OPTIONS.length)].value
-    const randomShoes = OUTFIT_SHOES_OPTIONS[Math.floor(Math.random() * OUTFIT_SHOES_OPTIONS.length)].value
-
-    setOutfitConfig({
-      top: randomTop,
-      topColor: OUTFIT_COLORS[Math.floor(Math.random() * OUTFIT_COLORS.length)],
-      bottom: randomBottom,
-      bottomColor: OUTFIT_COLORS[Math.floor(Math.random() * OUTFIT_COLORS.length)],
-      shoes: randomShoes,
-      shoesColor: OUTFIT_COLORS[Math.floor(Math.random() * OUTFIT_COLORS.length)]
-    })
-
-    // 랜덤 악세서리 (0~3개)
-    const count = Math.floor(Math.random() * 4)
-    const shuffled = [...ACCESSORY_OPTIONS].sort(() => Math.random() - 0.5)
-    const selected = shuffled.slice(0, count).map(a => a.value)
-
-    setAccessories(prev => prev.map(acc => ({
-      ...acc,
-      enabled: selected.includes(acc.type),
-      color: OUTFIT_COLORS[Math.floor(Math.random() * OUTFIT_COLORS.length)]
-    })))
-
-    toast.success('랜덤 캐릭터 생성!')
+    // 랜덤은 피부색만 변경 (라이브러리 모델은 수동 선택)
+    toast.success('랜덤 피부색 적용!')
   }
 
   // 인간형만 의상 표시
@@ -298,7 +284,7 @@ export default function CreatorPage() {
               캐릭터 만들기
             </h1>
             <p className="text-sm text-gray-400 mt-1">
-              체형, 피부색, 의상, 악세서리를 선택하여 나만의 캐릭터를 만드세요
+              체형, 피부색을 선택하고 라이브러리에서 의상과 악세서리를 입혀보세요
             </p>
           </div>
         </div>
@@ -404,23 +390,33 @@ export default function CreatorPage() {
                 />
                 <span className="text-gray-300">피부</span>
               </div>
-              {isHumanoid && outfitConfig.top !== 'none' && (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded border border-gray-500" style={{ backgroundColor: outfitConfig.topColor }} />
-                  <span className="text-gray-300 text-xs">{OUTFIT_TOP_OPTIONS.find(o => o.value === outfitConfig.top)?.label}</span>
-                </div>
-              )}
-              {isHumanoid && outfitConfig.bottom !== 'none' && (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded border border-gray-500" style={{ backgroundColor: outfitConfig.bottomColor }} />
-                  <span className="text-gray-300 text-xs">{OUTFIT_BOTTOM_OPTIONS.find(o => o.value === outfitConfig.bottom)?.label}</span>
-                </div>
-              )}
-              {accessories.filter(a => a.enabled).length > 0 && (
-                <div className="flex items-center gap-1 flex-wrap">
-                  <span className="text-gray-400 text-xs">악세서리:</span>
-                  <span className="text-gray-300 text-xs">{accessories.filter(a => a.enabled).length}개</span>
-                </div>
+              {isHumanoid && (
+                <>
+                  {outfitConfig.top && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-400 text-xs">👕</span>
+                      <span className="text-gray-300 text-xs truncate">{outfitConfig.top.name}</span>
+                    </div>
+                  )}
+                  {outfitConfig.bottom && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-400 text-xs">👖</span>
+                      <span className="text-gray-300 text-xs truncate">{outfitConfig.bottom.name}</span>
+                    </div>
+                  )}
+                  {outfitConfig.shoes && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-400 text-xs">👟</span>
+                      <span className="text-gray-300 text-xs truncate">{outfitConfig.shoes.name}</span>
+                    </div>
+                  )}
+                  {Object.keys(accessoryConfig).length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="text-gray-400 text-xs">악세서리:</span>
+                      <span className="text-gray-300 text-xs">{Object.keys(accessoryConfig).length}개</span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -437,9 +433,7 @@ export default function CreatorPage() {
               skeletonType={skeletonType}
               skinColor={SKIN_COLORS[skinColorIndex]}
               outfitConfig={isHumanoid ? outfitConfig : undefined}
-              accessories={isHumanoid ? accessories.filter(a => a.enabled) : []}
-              externalModelUrl={externalModelUrl}
-              externalModelType={externalModelType}
+              accessoryConfig={isHumanoid ? accessoryConfig : undefined}
             />
           </Suspense>
 
@@ -519,207 +513,334 @@ export default function CreatorPage() {
             )}
 
             {activeTab === 'outfit' && isHumanoid && (
-              <div className="space-y-6">
-                {/* 외부 모델 업로드 */}
-                <div className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-lg p-4 border border-blue-500/30">
-                  <h4 className="text-white text-sm font-medium mb-3 flex items-center gap-2">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    외부 3D 모델 업로드
-                  </h4>
-                  <p className="text-gray-400 text-xs mb-3">
-                    GLB 파일만 지원 (텍스처 포함, 최대 20MB)<br/>
-                    <span className="text-yellow-400">💡 GLTF는 GLB로 변환 필요</span>
-                  </p>
-                  <label className="block">
-                    <input
-                      type="file"
-                      accept=".glb"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      id="model-upload"
-                    />
-                    <div className="bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-center gap-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                      </svg>
-                      파일 선택
-                    </div>
-                  </label>
-                  {externalModelUrl && (
-                    <div className="mt-3 flex items-center justify-between bg-green-600/20 border border-green-500/30 rounded px-3 py-2">
-                      <span className="text-green-400 text-xs">✓ 모델 로드됨</span>
-                      <button
-                        onClick={() => {
-                          setExternalModelUrl(null)
-                          setExternalModelType(null)
-                          toast.info('외부 모델이 제거되었습니다')
-                        }}
-                        className="text-red-400 hover:text-red-300 text-xs"
-                      >
-                        제거
-                      </button>
-                    </div>
-                  )}
-                </div>
+              <div className="space-y-4">
+                <p className="text-gray-400 text-xs mb-3">라이브러리에서 의상을 선택하고 위치를 조정하세요</p>
 
-                <div className="border-t border-gray-700 pt-4">
-                  <p className="text-gray-500 text-xs mb-4">또는 기본 의상 선택:</p>
-                </div>
-
-                {/* 상의 */}
-                <div>
-                  <h4 className="text-white text-sm font-medium mb-2">상의</h4>
-                  <div className="grid grid-cols-3 gap-2 mb-2">
-                    {OUTFIT_TOP_OPTIONS.map(opt => (
-                      <button
-                        key={opt.value}
-                        onClick={() => setOutfitConfig(prev => ({ ...prev, top: opt.value }))}
-                        className={`p-2 text-xs rounded-lg transition-all ${
-                          outfitConfig.top === opt.value
-                            ? 'bg-green-600 text-white'
-                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                  {outfitConfig.top !== 'none' && (
-                    <div>
-                      <p className="text-gray-400 text-xs mb-1">상의 색상</p>
-                      <div className="grid grid-cols-10 gap-1">
-                        {OUTFIT_COLORS.map((color, i) => (
+                {OUTFIT_SUBCATEGORIES.map(({ key, label, subcategory }) => {
+                  const selected = outfitConfig[key as keyof OutfitConfig]
+                  return (
+                    <div key={key} className="bg-gray-700 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-white text-sm font-medium">{label}</span>
+                        {selected && (
                           <button
-                            key={i}
-                            onClick={() => setOutfitConfig(prev => ({ ...prev, topColor: color }))}
-                            className={`w-6 h-6 rounded transition-all ${
-                              outfitConfig.topColor === color ? 'ring-2 ring-white scale-110' : ''
-                            }`}
-                            style={{ backgroundColor: color }}
-                          />
-                        ))}
+                            onClick={() => removeOutfit(key as keyof OutfitConfig)}
+                            className="text-red-400 hover:text-red-300 text-xs"
+                          >
+                            제거
+                          </button>
+                        )}
                       </div>
+                      {selected ? (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 bg-green-600/20 border border-green-500/30 rounded px-3 py-2">
+                            <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span className="text-green-400 text-sm truncate">{selected.name}</span>
+                          </div>
+                          {/* 위치 조정 */}
+                          <div className="space-y-2 bg-gray-800 rounded p-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400 text-xs w-6">X</span>
+                              <input
+                                type="range"
+                                min="-2"
+                                max="2"
+                                step="0.05"
+                                value={selected.position[0]}
+                                onChange={(e) => {
+                                  const newPos: [number, number, number] = [...selected.position]
+                                  newPos[0] = parseFloat(e.target.value)
+                                  updateOutfitTransform(key as keyof OutfitConfig, 'position', newPos)
+                                }}
+                                className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-green-500"
+                              />
+                              <span className="text-gray-300 text-xs w-10 text-right">{selected.position[0].toFixed(2)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400 text-xs w-6">Y</span>
+                              <input
+                                type="range"
+                                min="-1"
+                                max="3"
+                                step="0.05"
+                                value={selected.position[1]}
+                                onChange={(e) => {
+                                  const newPos: [number, number, number] = [...selected.position]
+                                  newPos[1] = parseFloat(e.target.value)
+                                  updateOutfitTransform(key as keyof OutfitConfig, 'position', newPos)
+                                }}
+                                className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-green-500"
+                              />
+                              <span className="text-gray-300 text-xs w-10 text-right">{selected.position[1].toFixed(2)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400 text-xs w-6">Z</span>
+                              <input
+                                type="range"
+                                min="-2"
+                                max="2"
+                                step="0.05"
+                                value={selected.position[2]}
+                                onChange={(e) => {
+                                  const newPos: [number, number, number] = [...selected.position]
+                                  newPos[2] = parseFloat(e.target.value)
+                                  updateOutfitTransform(key as keyof OutfitConfig, 'position', newPos)
+                                }}
+                                className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-green-500"
+                              />
+                              <span className="text-gray-300 text-xs w-10 text-right">{selected.position[2].toFixed(2)}</span>
+                            </div>
+                            <div className="flex items-center gap-2 border-t border-gray-700 pt-2 mt-2">
+                              <span className="text-gray-400 text-xs w-6">크기</span>
+                              <input
+                                type="range"
+                                min="0.1"
+                                max="3"
+                                step="0.05"
+                                value={selected.scale}
+                                onChange={(e) => {
+                                  updateOutfitTransform(key as keyof OutfitConfig, 'scale', parseFloat(e.target.value))
+                                }}
+                                className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-yellow-500"
+                              />
+                              <span className="text-gray-300 text-xs w-10 text-right">{selected.scale.toFixed(2)}</span>
+                            </div>
+                            {/* 회전 조정 */}
+                            <div className="text-gray-500 text-xs border-t border-gray-700 pt-2 mt-2 mb-1">회전 (도)</div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400 text-xs w-6">RX</span>
+                              <input
+                                type="range"
+                                min="-180"
+                                max="180"
+                                step="5"
+                                value={Math.round(selected.rotation[0] * 180 / Math.PI)}
+                                onChange={(e) => {
+                                  const newRot: [number, number, number] = [...selected.rotation]
+                                  newRot[0] = parseFloat(e.target.value) * Math.PI / 180
+                                  updateOutfitTransform(key as keyof OutfitConfig, 'rotation', newRot)
+                                }}
+                                className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                              />
+                              <span className="text-gray-300 text-xs w-10 text-right">{Math.round(selected.rotation[0] * 180 / Math.PI)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400 text-xs w-6">RY</span>
+                              <input
+                                type="range"
+                                min="-180"
+                                max="180"
+                                step="5"
+                                value={Math.round(selected.rotation[1] * 180 / Math.PI)}
+                                onChange={(e) => {
+                                  const newRot: [number, number, number] = [...selected.rotation]
+                                  newRot[1] = parseFloat(e.target.value) * Math.PI / 180
+                                  updateOutfitTransform(key as keyof OutfitConfig, 'rotation', newRot)
+                                }}
+                                className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                              />
+                              <span className="text-gray-300 text-xs w-10 text-right">{Math.round(selected.rotation[1] * 180 / Math.PI)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400 text-xs w-6">RZ</span>
+                              <input
+                                type="range"
+                                min="-180"
+                                max="180"
+                                step="5"
+                                value={Math.round(selected.rotation[2] * 180 / Math.PI)}
+                                onChange={(e) => {
+                                  const newRot: [number, number, number] = [...selected.rotation]
+                                  newRot[2] = parseFloat(e.target.value) * Math.PI / 180
+                                  updateOutfitTransform(key as keyof OutfitConfig, 'rotation', newRot)
+                                }}
+                                className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                              />
+                              <span className="text-gray-300 text-xs w-10 text-right">{Math.round(selected.rotation[2] * 180 / Math.PI)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => openLibrary('outfits', subcategory)}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                          라이브러리에서 선택
+                        </button>
+                      )}
                     </div>
-                  )}
-                </div>
-
-                {/* 하의 */}
-                <div>
-                  <h4 className="text-white text-sm font-medium mb-2">하의</h4>
-                  <div className="grid grid-cols-3 gap-2 mb-2">
-                    {OUTFIT_BOTTOM_OPTIONS.map(opt => (
-                      <button
-                        key={opt.value}
-                        onClick={() => setOutfitConfig(prev => ({ ...prev, bottom: opt.value }))}
-                        className={`p-2 text-xs rounded-lg transition-all ${
-                          outfitConfig.bottom === opt.value
-                            ? 'bg-green-600 text-white'
-                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                  {outfitConfig.bottom !== 'none' && (
-                    <div>
-                      <p className="text-gray-400 text-xs mb-1">하의 색상</p>
-                      <div className="grid grid-cols-10 gap-1">
-                        {OUTFIT_COLORS.map((color, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setOutfitConfig(prev => ({ ...prev, bottomColor: color }))}
-                            className={`w-6 h-6 rounded transition-all ${
-                              outfitConfig.bottomColor === color ? 'ring-2 ring-white scale-110' : ''
-                            }`}
-                            style={{ backgroundColor: color }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* 신발 */}
-                <div>
-                  <h4 className="text-white text-sm font-medium mb-2">신발</h4>
-                  <div className="grid grid-cols-3 gap-2 mb-2">
-                    {OUTFIT_SHOES_OPTIONS.map(opt => (
-                      <button
-                        key={opt.value}
-                        onClick={() => setOutfitConfig(prev => ({ ...prev, shoes: opt.value }))}
-                        className={`p-2 text-xs rounded-lg transition-all ${
-                          outfitConfig.shoes === opt.value
-                            ? 'bg-green-600 text-white'
-                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                  {outfitConfig.shoes !== 'none' && (
-                    <div>
-                      <p className="text-gray-400 text-xs mb-1">신발 색상</p>
-                      <div className="grid grid-cols-10 gap-1">
-                        {OUTFIT_COLORS.map((color, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setOutfitConfig(prev => ({ ...prev, shoesColor: color }))}
-                            className={`w-6 h-6 rounded transition-all ${
-                              outfitConfig.shoesColor === color ? 'ring-2 ring-white scale-110' : ''
-                            }`}
-                            style={{ backgroundColor: color }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  )
+                })}
               </div>
             )}
 
             {activeTab === 'accessory' && isHumanoid && (
-              <div className="space-y-3">
-                <p className="text-gray-400 text-xs mb-3">악세서리를 선택하고 색상을 지정하세요</p>
-                {ACCESSORY_OPTIONS.map(opt => {
-                  const config = accessories.find(a => a.type === opt.value)!
+              <div className="space-y-4">
+                <p className="text-gray-400 text-xs mb-3">라이브러리에서 악세서리를 선택하고 위치를 조정하세요</p>
+
+                {ACCESSORY_SUBCATEGORIES.map(({ key, label, icon }) => {
+                  const selected = accessoryConfig[key as keyof AccessoryConfig]
                   return (
-                    <div key={opt.value} className="bg-gray-700 rounded-lg p-3">
+                    <div key={key} className="bg-gray-700 rounded-lg p-3">
                       <div className="flex items-center justify-between mb-2">
-                        <button
-                          onClick={() => toggleAccessory(opt.value)}
-                          className={`flex items-center gap-2 ${config.enabled ? 'text-white' : 'text-gray-400'}`}
-                        >
-                          <span className="text-lg">{opt.icon}</span>
-                          <span className="text-sm font-medium">{opt.label}</span>
-                        </button>
-                        <button
-                          onClick={() => toggleAccessory(opt.value)}
-                          className={`w-10 h-6 rounded-full transition-colors ${
-                            config.enabled ? 'bg-blue-600' : 'bg-gray-600'
-                          }`}
-                        >
-                          <div className={`w-4 h-4 bg-white rounded-full transition-transform mx-1 ${
-                            config.enabled ? 'translate-x-4' : 'translate-x-0'
-                          }`} />
-                        </button>
+                        <span className="text-white text-sm font-medium">
+                          {icon} {label}
+                        </span>
+                        {selected && (
+                          <button
+                            onClick={() => removeAccessory(key as keyof AccessoryConfig)}
+                            className="text-red-400 hover:text-red-300 text-xs"
+                          >
+                            제거
+                          </button>
+                        )}
                       </div>
-                      {config.enabled && (
-                        <div className="grid grid-cols-10 gap-1">
-                          {OUTFIT_COLORS.map((color, i) => (
-                            <button
-                              key={i}
-                              onClick={() => setAccessoryColor(opt.value, color)}
-                              className={`w-5 h-5 rounded transition-all ${
-                                config.color === color ? 'ring-2 ring-white scale-110' : ''
-                              }`}
-                              style={{ backgroundColor: color }}
-                            />
-                          ))}
+                      {selected ? (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 bg-blue-600/20 border border-blue-500/30 rounded px-3 py-2">
+                            <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span className="text-blue-400 text-sm truncate">{selected.name}</span>
+                          </div>
+                          {/* 위치 조정 */}
+                          <div className="space-y-2 bg-gray-800 rounded p-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400 text-xs w-6">X</span>
+                              <input
+                                type="range"
+                                min="-2"
+                                max="2"
+                                step="0.05"
+                                value={selected.position[0]}
+                                onChange={(e) => {
+                                  const newPos: [number, number, number] = [...selected.position]
+                                  newPos[0] = parseFloat(e.target.value)
+                                  updateAccessoryTransform(key as keyof AccessoryConfig, 'position', newPos)
+                                }}
+                                className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                              />
+                              <span className="text-gray-300 text-xs w-10 text-right">{selected.position[0].toFixed(2)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400 text-xs w-6">Y</span>
+                              <input
+                                type="range"
+                                min="-1"
+                                max="3"
+                                step="0.05"
+                                value={selected.position[1]}
+                                onChange={(e) => {
+                                  const newPos: [number, number, number] = [...selected.position]
+                                  newPos[1] = parseFloat(e.target.value)
+                                  updateAccessoryTransform(key as keyof AccessoryConfig, 'position', newPos)
+                                }}
+                                className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                              />
+                              <span className="text-gray-300 text-xs w-10 text-right">{selected.position[1].toFixed(2)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400 text-xs w-6">Z</span>
+                              <input
+                                type="range"
+                                min="-2"
+                                max="2"
+                                step="0.05"
+                                value={selected.position[2]}
+                                onChange={(e) => {
+                                  const newPos: [number, number, number] = [...selected.position]
+                                  newPos[2] = parseFloat(e.target.value)
+                                  updateAccessoryTransform(key as keyof AccessoryConfig, 'position', newPos)
+                                }}
+                                className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                              />
+                              <span className="text-gray-300 text-xs w-10 text-right">{selected.position[2].toFixed(2)}</span>
+                            </div>
+                            <div className="flex items-center gap-2 border-t border-gray-700 pt-2 mt-2">
+                              <span className="text-gray-400 text-xs w-6">크기</span>
+                              <input
+                                type="range"
+                                min="0.1"
+                                max="3"
+                                step="0.05"
+                                value={selected.scale}
+                                onChange={(e) => {
+                                  updateAccessoryTransform(key as keyof AccessoryConfig, 'scale', parseFloat(e.target.value))
+                                }}
+                                className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-yellow-500"
+                              />
+                              <span className="text-gray-300 text-xs w-10 text-right">{selected.scale.toFixed(2)}</span>
+                            </div>
+                            {/* 회전 조정 */}
+                            <div className="text-gray-500 text-xs border-t border-gray-700 pt-2 mt-2 mb-1">회전 (도)</div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400 text-xs w-6">RX</span>
+                              <input
+                                type="range"
+                                min="-180"
+                                max="180"
+                                step="5"
+                                value={Math.round(selected.rotation[0] * 180 / Math.PI)}
+                                onChange={(e) => {
+                                  const newRot: [number, number, number] = [...selected.rotation]
+                                  newRot[0] = parseFloat(e.target.value) * Math.PI / 180
+                                  updateAccessoryTransform(key as keyof AccessoryConfig, 'rotation', newRot)
+                                }}
+                                className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                              />
+                              <span className="text-gray-300 text-xs w-10 text-right">{Math.round(selected.rotation[0] * 180 / Math.PI)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400 text-xs w-6">RY</span>
+                              <input
+                                type="range"
+                                min="-180"
+                                max="180"
+                                step="5"
+                                value={Math.round(selected.rotation[1] * 180 / Math.PI)}
+                                onChange={(e) => {
+                                  const newRot: [number, number, number] = [...selected.rotation]
+                                  newRot[1] = parseFloat(e.target.value) * Math.PI / 180
+                                  updateAccessoryTransform(key as keyof AccessoryConfig, 'rotation', newRot)
+                                }}
+                                className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                              />
+                              <span className="text-gray-300 text-xs w-10 text-right">{Math.round(selected.rotation[1] * 180 / Math.PI)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400 text-xs w-6">RZ</span>
+                              <input
+                                type="range"
+                                min="-180"
+                                max="180"
+                                step="5"
+                                value={Math.round(selected.rotation[2] * 180 / Math.PI)}
+                                onChange={(e) => {
+                                  const newRot: [number, number, number] = [...selected.rotation]
+                                  newRot[2] = parseFloat(e.target.value) * Math.PI / 180
+                                  updateAccessoryTransform(key as keyof AccessoryConfig, 'rotation', newRot)
+                                }}
+                                className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                              />
+                              <span className="text-gray-300 text-xs w-10 text-right">{Math.round(selected.rotation[2] * 180 / Math.PI)}</span>
+                            </div>
+                          </div>
                         </div>
+                      ) : (
+                        <button
+                          onClick={() => openLibrary('accessories', key)}
+                          className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                          라이브러리에서 선택
+                        </button>
                       )}
                     </div>
                   )
@@ -730,13 +851,23 @@ export default function CreatorPage() {
             {/* 동물 캐릭터는 의상/악세서리 미지원 */}
             {!isHumanoid && (activeTab === 'outfit' || activeTab === 'accessory') && (
               <div className="text-center py-8 text-gray-500">
-                <p>동물 캐릭터는 의상/악세사리를</p>
+                <p>동물 캐릭터는 의상/악세서리를</p>
                 <p>지원하지 않습니다</p>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* 라이브러리 모달 */}
+      {showLibrary && (
+        <ModelLibrary
+          onClose={() => setShowLibrary(false)}
+          onSelectModel={handleSelectModel}
+          category={libraryCategory}
+          subcategory={librarySubcategory}
+        />
+      )}
     </main>
   )
 }

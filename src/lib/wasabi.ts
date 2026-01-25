@@ -124,7 +124,153 @@ export async function deleteMappingFromWasabi(modelName: string): Promise<boolea
 }
 
 // ============================================
-// Creator 모델 저장 (GLB 파일)
+// Creator 모델 저장 (GLB 파일) - 의상/악세서리 라이브러리
+// ============================================
+
+const LIBRARY_PREFIX = 'library/'
+
+// 의상 서브카테고리
+export type OutfitSubcategory = 'tops' | 'bottoms' | 'shoes' | 'fullbody'
+
+// 악세서리 서브카테고리
+export type AccessorySubcategory = 'hats' | 'glasses' | 'bags' | 'jewelry' | 'other'
+
+export interface WasabiLibraryModel {
+  id: string
+  name: string
+  category: 'outfits' | 'accessories'
+  subcategory: string
+  timestamp: number
+  size: number
+  url?: string
+}
+
+// GLB 모델 파일 업로드 (라이브러리용)
+export async function uploadLibraryModel(
+  file: Buffer,
+  fileName: string,
+  category: 'outfits' | 'accessories',
+  subcategory: string
+): Promise<WasabiLibraryModel | null> {
+  try {
+    const id = `${Date.now()}-${fileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+    const key = `${LIBRARY_PREFIX}${category}/${subcategory}/${id}`
+
+    await wasabiClient.send(new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: file,
+      ContentType: 'model/gltf-binary',
+      Metadata: {
+        originalName: fileName,
+        category: category,
+        subcategory: subcategory,
+        uploadTime: Date.now().toString(),
+      },
+    }))
+
+    // 메타데이터 저장
+    const metadata: WasabiLibraryModel = {
+      id,
+      name: fileName.replace('.glb', ''),
+      category,
+      subcategory,
+      timestamp: Date.now(),
+      size: file.length,
+    }
+
+    await wasabiClient.send(new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: `${key}.meta.json`,
+      Body: JSON.stringify(metadata),
+      ContentType: 'application/json',
+    }))
+
+    return metadata
+  } catch (error) {
+    console.error('Wasabi 라이브러리 모델 업로드 오류:', error)
+    return null
+  }
+}
+
+// 라이브러리 모델 목록 조회
+export async function listLibraryModels(
+  category: 'outfits' | 'accessories',
+  subcategory?: string
+): Promise<WasabiLibraryModel[]> {
+  try {
+    const prefix = subcategory
+      ? `${LIBRARY_PREFIX}${category}/${subcategory}/`
+      : `${LIBRARY_PREFIX}${category}/`
+
+    const response = await wasabiClient.send(new ListObjectsV2Command({
+      Bucket: BUCKET_NAME,
+      Prefix: prefix,
+    }))
+
+    const models: WasabiLibraryModel[] = []
+
+    if (response.Contents) {
+      for (const item of response.Contents) {
+        if (item.Key && item.Key.endsWith('.meta.json')) {
+          try {
+            const getResponse = await wasabiClient.send(new GetObjectCommand({
+              Bucket: BUCKET_NAME,
+              Key: item.Key,
+            }))
+
+            if (getResponse.Body) {
+              const bodyString = await getResponse.Body.transformToString()
+              const metadata = JSON.parse(bodyString) as WasabiLibraryModel
+              models.push(metadata)
+            }
+          } catch (e) {
+            console.error(`메타데이터 읽기 실패: ${item.Key}`, e)
+          }
+        }
+      }
+    }
+
+    // 최신순 정렬
+    models.sort((a, b) => b.timestamp - a.timestamp)
+
+    return models
+  } catch (error) {
+    console.error('Wasabi 라이브러리 모델 목록 조회 오류:', error)
+    return []
+  }
+}
+
+// 라이브러리 모델 삭제
+export async function deleteLibraryModel(
+  id: string,
+  category: 'outfits' | 'accessories',
+  subcategory: string
+): Promise<boolean> {
+  try {
+    const key = `${LIBRARY_PREFIX}${category}/${subcategory}/${id}`
+
+    // GLB 파일 삭제
+    await wasabiClient.send(new DeleteObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    }))
+
+    // 메타데이터 삭제
+    await wasabiClient.send(new DeleteObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: `${key}.meta.json`,
+    }))
+
+    return true
+  } catch (error) {
+    console.error('Wasabi 라이브러리 모델 삭제 오류:', error)
+    return false
+  }
+}
+
+// ============================================
+// Creator 모델 저장 (GLB 파일) - 레거시 호환
 // ============================================
 
 const MODELS_PREFIX = 'creator-models/'

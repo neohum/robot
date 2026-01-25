@@ -5,16 +5,15 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Grid, PerspectiveCamera } from '@react-three/drei'
 import * as THREE from 'three'
 import { GLTFExporter } from 'three-stdlib'
-import type { SkeletonType, OutfitConfig, AccessoryConfig } from '@/app/creator/page'
+import type { SkeletonType, OutfitConfig, AccessoryConfig, SelectedModel } from '@/app/creator/page'
 import ModelLoader from '../ModelLoader'
+import { ModelErrorBoundary } from '../ModelErrorBoundary'
 
 interface CreatorSceneProps {
   skeletonType: SkeletonType
   skinColor: string
   outfitConfig?: OutfitConfig
-  accessories?: AccessoryConfig[]
-  externalModelUrl?: string | null
-  externalModelType?: string | null
+  accessoryConfig?: AccessoryConfig
 }
 
 // 스켈레톤 타입별 스케일
@@ -1588,7 +1587,38 @@ function Accessory({ type, color, scale }: { type: string; color: string; scale:
   return null
 }
 
-function Scene({ skeletonType, skinColor, outfitConfig, accessories = [], externalModelUrl, externalModelType }: CreatorSceneProps) {
+// 라이브러리 모델 로더 컴포넌트
+function LibraryModelRenderer({ model, skeletonScale }: { model: SelectedModel; skeletonScale: number }) {
+  // 모델의 position, rotation, scale을 적용 (스켈레톤 스케일과 모델 스케일 결합)
+  const finalScale = model.scale * skeletonScale
+
+  return (
+    <group position={model.position} rotation={model.rotation}>
+      <ModelErrorBoundary fallback={
+        <mesh position={[0, 1, 0]}>
+          <boxGeometry args={[0.2, 0.2, 0.2]} />
+          <meshStandardMaterial color="red" />
+        </mesh>
+      }>
+        <Suspense fallback={
+          <mesh position={[0, 0.5, 0]}>
+            <boxGeometry args={[0.1, 0.1, 0.1]} />
+            <meshStandardMaterial color="gray" wireframe />
+          </mesh>
+        }>
+          <ModelLoader
+            url={model.url}
+            fileType="glb"
+            position={[0, 0, 0]}
+            scale={finalScale}
+          />
+        </Suspense>
+      </ModelErrorBoundary>
+    </group>
+  )
+}
+
+function Scene({ skeletonType, skinColor, outfitConfig, accessoryConfig }: CreatorSceneProps) {
   const scale = SKELETON_SCALES[skeletonType]
 
   // 스켈레톤 타입에 따른 카메라 타겟
@@ -1597,6 +1627,25 @@ function Scene({ skeletonType, skinColor, outfitConfig, accessories = [], extern
     : skeletonType === 'bird'
       ? [0, 0.3, 0]
       : [0, 0.5, 0]
+
+  // 의상 및 악세서리 모델 수집
+  const outfitModels: SelectedModel[] = []
+  const accessoryModels: SelectedModel[] = []
+
+  if (outfitConfig) {
+    if (outfitConfig.top) outfitModels.push(outfitConfig.top)
+    if (outfitConfig.bottom) outfitModels.push(outfitConfig.bottom)
+    if (outfitConfig.shoes) outfitModels.push(outfitConfig.shoes)
+    if (outfitConfig.fullbody) outfitModels.push(outfitConfig.fullbody)
+  }
+
+  if (accessoryConfig) {
+    if (accessoryConfig.hats) accessoryModels.push(accessoryConfig.hats)
+    if (accessoryConfig.glasses) accessoryModels.push(accessoryConfig.glasses)
+    if (accessoryConfig.bags) accessoryModels.push(accessoryConfig.bags)
+    if (accessoryConfig.jewelry) accessoryModels.push(accessoryConfig.jewelry)
+    if (accessoryConfig.other) accessoryModels.push(accessoryConfig.other)
+  }
 
   return (
     <>
@@ -1627,30 +1676,22 @@ function Scene({ skeletonType, skinColor, outfitConfig, accessories = [], extern
         skinColor={skinColor}
       />
 
-      {/* 외부 3D 모델 */}
-      {externalModelUrl && (
-        <Suspense fallback={null}>
-          <ModelLoader
-            url={externalModelUrl}
-            fileType={externalModelType || undefined}
-            position={[0, 0, 0]}
-            scale={1}
-          />
-        </Suspense>
-      )}
+      {/* 라이브러리에서 선택한 의상 모델들 */}
+      {outfitModels.map((model, index) => (
+        <LibraryModelRenderer
+          key={`outfit-${model.name}-${index}`}
+          model={model}
+          skeletonScale={scale}
+        />
+      ))}
 
-      {/* 의상 (인간형만, 외부 모델 없을 때만) */}
-      {outfitConfig && !externalModelUrl && (
-        <group name="outfit">
-          <OutfitTop type={outfitConfig.top} color={outfitConfig.topColor} scale={scale} />
-          <OutfitBottom type={outfitConfig.bottom} color={outfitConfig.bottomColor} scale={scale} />
-          <OutfitShoes type={outfitConfig.shoes} color={outfitConfig.shoesColor} scale={scale} />
-        </group>
-      )}
-
-      {/* 악세서리 */}
-      {accessories.map((acc, index) => (
-        <Accessory key={`${acc.type}-${index}`} type={acc.type} color={acc.color} scale={scale} />
+      {/* 라이브러리에서 선택한 악세서리 모델들 */}
+      {accessoryModels.map((model, index) => (
+        <LibraryModelRenderer
+          key={`accessory-${model.name}-${index}`}
+          model={model}
+          skeletonScale={scale}
+        />
       ))}
 
       {/* 바닥 */}
