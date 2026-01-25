@@ -5,13 +5,13 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Grid, PerspectiveCamera, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { GLTFExporter } from 'three-stdlib'
-import type { SkeletonType } from '@/app/creator/page'
+import type { SkeletonType, OutfitConfig, AccessoryConfig } from '@/app/creator/page'
 
 interface CreatorSceneProps {
   skeletonType: SkeletonType
   skinColor: string
-  outfitModelUrl?: string
-  accessoryModelUrls?: string[]
+  outfitConfig?: OutfitConfig
+  accessories?: AccessoryConfig[]
 }
 
 // 스켈레톤 타입별 스케일
@@ -669,7 +669,7 @@ function ExternalModel({ url, scale = 1, position = [0, 0, 0] as [number, number
   )
 }
 
-function Scene({ skeletonType, skinColor, outfitModelUrl, accessoryModelUrls = [] }: CreatorSceneProps) {
+function Scene({ skeletonType, skinColor, outfitConfig, accessories = [] }: CreatorSceneProps) {
   const scale = SKELETON_SCALES[skeletonType]
 
   // 스켈레톤 타입에 따른 카메라 타겟
@@ -708,23 +708,8 @@ function Scene({ skeletonType, skinColor, outfitModelUrl, accessoryModelUrls = [
         skinColor={skinColor}
       />
 
-      {/* 의상 모델 (외부 GLB) */}
-      {outfitModelUrl && (
-        <Suspense fallback={null}>
-          <ExternalModel url={outfitModelUrl} scale={scale} />
-        </Suspense>
-      )}
-
-      {/* 악세서리 모델들 (외부 GLB) */}
-      {accessoryModelUrls.map((url, index) => (
-        <Suspense key={`accessory-${index}`} fallback={null}>
-          <ExternalModel
-            url={url}
-            scale={scale * 0.5}
-            position={[0, 0.2 * index, 0]}
-          />
-        </Suspense>
-      ))}
+      {/* 의상 및 악세서리는 현재 config 기반으로 시각적 표시 (추후 구현) */}
+      {/* outfitConfig와 accessories는 향후 모델 렌더링에 사용 예정 */}
 
       {/* 바닥 */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>

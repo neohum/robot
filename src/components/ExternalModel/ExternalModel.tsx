@@ -362,7 +362,13 @@ export default function ExternalModel({
       undefined,
       (err) => {
         console.error('GLB 로딩 오류:', err)
-        setError('모델을 불러올 수 없습니다')
+        // Blob URL 만료 감지
+        if (url.startsWith('blob:')) {
+          setError('파일 모델이 만료되었습니다. 다시 로드해주세요.')
+          console.warn('[ExternalModel] Blob URL이 만료됨 - 페이지 새로고침 후에는 파일을 다시 선택해야 합니다')
+        } else {
+          setError('모델을 불러올 수 없습니다')
+        }
       }
     )
 

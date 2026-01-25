@@ -105,11 +105,15 @@ export default function Home() {
     // 저장된 외부 모델 목록 불러오기
     setSavedExternalModels(getAllExternalModels())
 
-    // 마지막으로 사용한 외부 모델 불러오기
+    // 마지막으로 사용한 외부 모델 불러오기 (blob URL은 만료되므로 건너뛰기)
     const currentExternal = loadCurrentExternalModel()
-    if (currentExternal) {
+    if (currentExternal && !currentExternal.url.startsWith('blob:')) {
       setExternalModelUrl(currentExternal.url)
       setExternalModelName(currentExternal.name || '')
+    } else if (currentExternal?.url.startsWith('blob:')) {
+      console.log('[Simulator] Blob URL 만료됨, 모델 초기화')
+      // 만료된 blob URL은 저장소에서도 제거
+      localStorage.removeItem('robot-external-model-current')
     }
   }, [])
 
