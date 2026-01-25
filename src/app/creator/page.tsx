@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, Suspense, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
@@ -14,7 +14,39 @@ const CreatorScene = dynamic(
 export type SkeletonType = 'humanSmall' | 'humanMedium' | 'humanLarge' | 'quadruped' | 'biped' | 'bird'
 
 // 탭 타입
-type TabType = 'skin' | 'outfit' | 'accessory'
+type TabType = 'skin' | 'outfit' | 'accessory' | 'external'
+
+// 외부 모델 타입
+interface ExternalModel {
+  id: string
+  name: string
+  url: string
+  type: 'outfit' | 'accessory'
+}
+
+// 무료 모델 다운로드 소스
+const MODEL_SOURCES = [
+  {
+    name: 'Kenney Modular Characters',
+    url: 'https://kenney.nl/assets/modular-characters',
+    description: '40개 악세서리 포함 (CC0)'
+  },
+  {
+    name: 'Sketchfab CC0',
+    url: 'https://sketchfab.com/tags/cc0',
+    description: 'CC0 라이센스 3D 모델'
+  },
+  {
+    name: 'Clothing Kit (CC0)',
+    url: 'https://sketchfab.com/3d-models/clothing-and-character-kit-10-cc0-7c733dceb2e04c4fb7e7dbd85316c1e7',
+    description: '캐릭터 의상 키트'
+  },
+  {
+    name: 'Quaternius',
+    url: 'https://quaternius.com/',
+    description: '무료 로우폴리 3D 에셋'
+  }
+]
 
 // 카테고리별 스켈레톤 분류
 const SKELETON_CATEGORIES = {
@@ -165,6 +197,52 @@ export default function CreatorPage() {
   })
   const [modelName, setModelName] = useState('내 캐릭터')
   const [isExporting, setIsExporting] = useState(false)
+  const [externalModels, setExternalModels] = useState<ExternalModel[]>([])
+  const [selectedExternalModel, setSelectedExternalModel] = useState<ExternalModel | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // GLB 파일 업로드 핸들러
+  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!file.name.endsWith('.glb')) {
+      toast.error('GLB 파일만 업로드 가능합니다')
+      return
+    }
+
+    const url = URL.createObjectURL(file)
+    const newModel: ExternalModel = {
+      id: `upload-${Date.now()}`,
+      name: file.name.replace('.glb', ''),
+      url,
+      type: 'accessory'
+    }
+
+    setExternalModels(prev => [...prev, newModel])
+    setSelectedExternalModel(newModel)
+    toast.success(`${file.name} 업로드 완료!`)
+
+    // 파일 입력 초기화
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }, [])
+
+  // 외부 모델 제거
+  const handleRemoveExternalModel = useCallback((id: string) => {
+    setExternalModels(prev => {
+      const model = prev.find(m => m.id === id)
+      if (model?.url.startsWith('blob:')) {
+        URL.revokeObjectURL(model.url)
+      }
+      return prev.filter(m => m.id !== id)
+    })
+    if (selectedExternalModel?.id === id) {
+      setSelectedExternalModel(null)
+    }
+    toast.success('모델 제거됨')
+  }, [selectedExternalModel])
 
   const handleSkinColorSelect = (index: number) => {
     setCharacterConfig(prev => ({ ...prev, skinColorIndex: index }))
@@ -386,6 +464,7 @@ export default function CreatorPage() {
               skinColor={SKIN_COLORS[characterConfig.skinColorIndex]}
               outfitStyle={OUTFIT_STYLES[characterConfig.outfitIndex]}
               accessories={characterConfig.accessoryIndices.map(idx => ACCESSORY_OPTIONS[idx])}
+              externalModelUrl={selectedExternalModel?.url}
             />
           </Suspense>
 
@@ -428,6 +507,16 @@ export default function CreatorPage() {
               }`}
             >
               악세서리
+            </button>
+            <button
+              onClick={() => setActiveTab('external')}
+              className={`flex-1 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'external'
+                  ? 'text-white border-b-2 border-green-500'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              외부
             </button>
           </div>
 
@@ -508,6 +597,92 @@ export default function CreatorPage() {
                       <div className="text-xs">{acc.name}</div>
                     </button>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'external' && (
+              <div className="space-y-4">
+                {/* 파일 업로드 */}
+                <div>
+                  <p className="text-gray-400 text-xs mb-3">GLB 파일을 업로드하여 외부 모델을 추가하세요</p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".glb"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full p-4 border-2 border-dashed border-gray-600 rounded-lg hover:border-green-500 hover:bg-gray-700/50 transition-all text-gray-400 hover:text-green-400"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    <span className="text-sm">GLB 파일 업로드</span>
+                  </button>
+                </div>
+
+                {/* 업로드된 모델 목록 */}
+                {externalModels.length > 0 && (
+                  <div>
+                    <h4 className="text-white text-sm font-medium mb-2">업로드된 모델</h4>
+                    <div className="space-y-2">
+                      {externalModels.map((model) => (
+                        <div
+                          key={model.id}
+                          className={`p-3 rounded-lg flex items-center justify-between ${
+                            selectedExternalModel?.id === model.id
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-700 text-gray-300'
+                          }`}
+                        >
+                          <button
+                            onClick={() => setSelectedExternalModel(
+                              selectedExternalModel?.id === model.id ? null : model
+                            )}
+                            className="flex-1 text-left text-sm truncate"
+                          >
+                            {model.name}
+                          </button>
+                          <button
+                            onClick={() => handleRemoveExternalModel(model.id)}
+                            className="p-1 hover:bg-red-500 rounded transition-colors ml-2"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 무료 모델 다운로드 소스 */}
+                <div className="border-t border-gray-700 pt-4">
+                  <h4 className="text-white text-sm font-medium mb-2">무료 모델 다운로드</h4>
+                  <p className="text-gray-500 text-xs mb-3">아래 사이트에서 CC0 라이센스 GLB 모델을 다운로드하세요</p>
+                  <div className="space-y-2">
+                    {MODEL_SOURCES.map((source, i) => (
+                      <a
+                        key={i}
+                        href={source.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block p-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-white text-sm font-medium">{source.name}</span>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </div>
+                        <p className="text-gray-400 text-xs mt-1">{source.description}</p>
+                      </a>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

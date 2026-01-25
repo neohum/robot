@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect, Suspense } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Grid, PerspectiveCamera } from '@react-three/drei'
+import { OrbitControls, Grid, PerspectiveCamera, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { GLTFExporter } from 'three-stdlib'
 import type { SkeletonType } from '@/app/creator/page'
@@ -24,6 +24,7 @@ interface CreatorSceneProps {
   skinColor: string
   outfitStyle: OutfitStyle
   accessories: Accessory[]
+  externalModelUrl?: string
 }
 
 // 스켈레톤 타입별 스케일
@@ -503,7 +504,37 @@ function RobotModel({ skeletonType, skinColor, outfitStyle, accessories }: Robot
   )
 }
 
-function Scene({ skeletonType, skinColor, outfitStyle, accessories }: CreatorSceneProps) {
+// 외부 GLB 모델 로더
+function ExternalModel({ url, scale = 1 }: { url: string; scale?: number }) {
+  const { scene } = useGLTF(url)
+  const modelRef = useRef<THREE.Group>(null)
+
+  useEffect(() => {
+    if (scene) {
+      // 모델의 바운딩 박스 계산하여 크기 조정
+      const box = new THREE.Box3().setFromObject(scene)
+      const size = box.getSize(new THREE.Vector3())
+      const maxDim = Math.max(size.x, size.y, size.z)
+      const targetSize = 1.5 * scale
+      const scaleFactor = targetSize / maxDim
+
+      scene.scale.setScalar(scaleFactor)
+
+      // 바닥에 맞추기
+      box.setFromObject(scene)
+      const minY = box.min.y
+      scene.position.y = -minY
+    }
+  }, [scene, scale])
+
+  return (
+    <group ref={modelRef}>
+      <primitive object={scene.clone()} />
+    </group>
+  )
+}
+
+function Scene({ skeletonType, skinColor, outfitStyle, accessories, externalModelUrl }: CreatorSceneProps) {
   // 스켈레톤 타입에 따른 카메라 타겟
   const cameraTarget: [number, number, number] = skeletonType.startsWith('human')
     ? [0, 1, 0]
@@ -541,6 +572,13 @@ function Scene({ skeletonType, skinColor, outfitStyle, accessories }: CreatorSce
         outfitStyle={outfitStyle}
         accessories={accessories}
       />
+
+      {/* 외부 GLB 모델 */}
+      {externalModelUrl && (
+        <Suspense fallback={null}>
+          <ExternalModel url={externalModelUrl} scale={SKELETON_SCALES[skeletonType]} />
+        </Suspense>
+      )}
 
       {/* 바닥 */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>

@@ -1,0 +1,47 @@
+{
+  "outfits": [
+    {
+      "id": "basic",
+      "name": "기본",
+      "file": null,
+      "preview": null,
+      "color": "#6B7280",
+      "description": "기본 프리미티브 의상"
+    }
+  ],
+  "accessories": [
+    {
+      "id": "none",
+      "name": "없음",
+      "file": null,
+      "preview": null,
+      "type": "none",
+      "position": [0, 0, 0],
+      "scale": 1
+    }
+  ],
+  "sources": [
+    {
+      "name": "Kenney Modular Characters",
+      "url": "https://kenney.nl/assets/modular-characters",
+      "license": "CC0",
+      "description": "40개 악세서리 포함 모듈러 캐릭터 에셋"
+    },
+    {
+      "name": "Sketchfab CC0",
+      "url": "https://sketchfab.com/tags/cc0",
+      "license": "CC0",
+      "description": "CC0 라이센스 3D 모델"
+    },
+    {
+      "name": "Clothing And Character Kit",
+      "url": "https://sketchfab.com/3d-models/clothing-and-character-kit-10-cc0-7c733dceb2e04c4fb7e7dbd85316c1e7",
+      "license": "CC0",
+      "description": "캐릭터 의상 키트"
+    }
+  ],
+  "instructions": {
+    "ko": "1. 위 소스에서 GLB 파일을 다운로드하세요\n2. outfits/ 또는 accessories/ 폴더에 파일을 넣으세요\n3. 이 catalog.json 파일에 항목을 추가하세요",
+    "en": "1. Download GLB files from above sources\n2. Place files in outfits/ or accessories/ folder\n3. Add entries to this catalog.json file"
+  }
+}

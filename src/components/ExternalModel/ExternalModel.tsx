@@ -357,27 +357,22 @@ export default function ExternalModel({
   }, [url])
 
   // 커스텀 매핑이 변경되면 본 매핑만 재계산 (모델 다시 로드 X)
+  // onBonesFound를 호출하지 않음 - 무한 루프 방지
   useEffect(() => {
     if (!model) {
-      console.log('[ExternalModel] 모델이 없음, 스킵')
       return
     }
-    if (!customBoneMapping) {
-      console.log('[ExternalModel] 커스텀 매핑이 없음, 스킵')
+    if (!customBoneMapping || Object.keys(customBoneMapping).length === 0) {
       return
     }
 
     console.log('[ExternalModel] 커스텀 매핑으로 본 재계산 시작:', Object.keys(customBoneMapping).length, '개 관절')
 
-    const { allBones, mappings } = recalculateBoneMappings(model, customBoneMapping)
+    const { mappings } = recalculateBoneMappings(model, customBoneMapping)
 
     console.log('[ExternalModel] 본 매핑 재계산 완료:', mappings.length, '개 매핑됨')
-    console.log('[ExternalModel] 매핑된 관절:', mappings.map(m => `${m.jointKey}→${m.boneName}`).join(', '))
-
-    if (onBonesFound) {
-      onBonesFound(allBones, mappings)
-    }
-  }, [customBoneMapping, model, recalculateBoneMappings, onBonesFound])
+    // onBonesFound를 여기서 호출하지 않음 - 부모에서 이미 상태를 알고 있음
+  }, [customBoneMapping, model, recalculateBoneMappings])
 
   // 관절 각도를 본에 적용
   useFrame(() => {

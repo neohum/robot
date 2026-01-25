@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 // Wasabi 설정 (환경 변수에서 가져옴)
 const wasabiClient = new S3Client({
@@ -118,6 +119,154 @@ export async function deleteMappingFromWasabi(modelName: string): Promise<boolea
     return true
   } catch (error) {
     console.error('Wasabi 삭제 오류:', error)
+    return false
+  }
+}
+
+// ============================================
+// Creator 모델 저장 (GLB 파일)
+// ============================================
+
+const MODELS_PREFIX = 'creator-models/'
+
+export interface WasabiCreatorModel {
+  id: string
+  name: string
+  type: 'outfit' | 'accessory'
+  timestamp: number
+  size: number
+  url?: string
+}
+
+// GLB 모델 파일 업로드
+export async function uploadModelToWasabi(
+  file: Buffer,
+  fileName: string,
+  modelType: 'outfit' | 'accessory'
+): Promise<WasabiCreatorModel | null> {
+  try {
+    const id = `${Date.now()}-${fileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+    const key = `${MODELS_PREFIX}${modelType}s/${id}`
+
+    await wasabiClient.send(new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: file,
+      ContentType: 'model/gltf-binary',
+      Metadata: {
+        originalName: fileName,
+        modelType: modelType,
+        uploadTime: Date.now().toString(),
+      },
+    }))
+
+    // 메타데이터 저장
+    const metadata: WasabiCreatorModel = {
+      id,
+      name: fileName.replace('.glb', ''),
+      type: modelType,
+      timestamp: Date.now(),
+      size: file.length,
+    }
+
+    await wasabiClient.send(new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: `${key}.meta.json`,
+      Body: JSON.stringify(metadata),
+      ContentType: 'application/json',
+    }))
+
+    return metadata
+  } catch (error) {
+    console.error('Wasabi 모델 업로드 오류:', error)
+    return null
+  }
+}
+
+// GLB 모델 다운로드 URL 생성 (Presigned URL)
+export async function getModelDownloadUrl(id: string, modelType: 'outfit' | 'accessory'): Promise<string | null> {
+  try {
+    const key = `${MODELS_PREFIX}${modelType}s/${id}`
+
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    })
+
+    // 1시간 유효한 presigned URL 생성
+    const url = await getSignedUrl(wasabiClient, command, { expiresIn: 3600 })
+    return url
+  } catch (error) {
+    console.error('Wasabi 다운로드 URL 생성 오류:', error)
+    return null
+  }
+}
+
+// 모든 Creator 모델 목록 조회
+export async function listCreatorModels(modelType?: 'outfit' | 'accessory'): Promise<WasabiCreatorModel[]> {
+  try {
+    const prefix = modelType
+      ? `${MODELS_PREFIX}${modelType}s/`
+      : MODELS_PREFIX
+
+    const response = await wasabiClient.send(new ListObjectsV2Command({
+      Bucket: BUCKET_NAME,
+      Prefix: prefix,
+    }))
+
+    const models: WasabiCreatorModel[] = []
+
+    if (response.Contents) {
+      for (const item of response.Contents) {
+        if (item.Key && item.Key.endsWith('.meta.json')) {
+          try {
+            const getResponse = await wasabiClient.send(new GetObjectCommand({
+              Bucket: BUCKET_NAME,
+              Key: item.Key,
+            }))
+
+            if (getResponse.Body) {
+              const bodyString = await getResponse.Body.transformToString()
+              const metadata = JSON.parse(bodyString) as WasabiCreatorModel
+              models.push(metadata)
+            }
+          } catch (e) {
+            console.error(`메타데이터 읽기 실패: ${item.Key}`, e)
+          }
+        }
+      }
+    }
+
+    // 최신순 정렬
+    models.sort((a, b) => b.timestamp - a.timestamp)
+
+    return models
+  } catch (error) {
+    console.error('Wasabi 모델 목록 조회 오류:', error)
+    return []
+  }
+}
+
+// Creator 모델 삭제
+export async function deleteCreatorModel(id: string, modelType: 'outfit' | 'accessory'): Promise<boolean> {
+  try {
+    const key = `${MODELS_PREFIX}${modelType}s/${id}`
+
+    // GLB 파일 삭제
+    await wasabiClient.send(new DeleteObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    }))
+
+    // 메타데이터 삭제
+    await wasabiClient.send(new DeleteObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: `${key}.meta.json`,
+    }))
+
+    return true
+  } catch (error) {
+    console.error('Wasabi 모델 삭제 오류:', error)
     return false
   }
 }

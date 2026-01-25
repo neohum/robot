@@ -681,6 +681,8 @@ export default function Home() {
     if (file) {
       const url = URL.createObjectURL(file)
       const name = file.name.replace(/\.(glb|gltf)$/i, '')
+      boneMappingLoadedRef.current = false // 새 모델이므로 리셋
+      setCustomBoneMapping({} as Record<HumanoidJointKey, string>)
       setExternalModelUrl(url)
       setExternalModelName(name)
       setModelType('external')
@@ -696,6 +698,8 @@ export default function Home() {
   const handleExternalModelUrlLoad = (url: string, name?: string) => {
     if (url) {
       const modelName = name || url.split('/').pop()?.replace(/\.(glb|gltf)$/i, '') || 'external-model'
+      boneMappingLoadedRef.current = false // 새 모델이므로 리셋
+      setCustomBoneMapping({} as Record<HumanoidJointKey, string>)
       setExternalModelUrl(url)
       setExternalModelName(modelName)
       setModelType('external')
@@ -709,6 +713,8 @@ export default function Home() {
 
   // 저장된 외부 모델 불러오기
   const handleLoadSavedExternalModel = (model: SavedExternalModel) => {
+    boneMappingLoadedRef.current = false // 새 모델이므로 리셋
+    setCustomBoneMapping({} as Record<HumanoidJointKey, string>)
     setExternalModelUrl(model.url)
     setExternalModelName(model.name)
     setModelType('external')
@@ -736,20 +742,22 @@ export default function Home() {
     }
   }
 
-  // 본 발견 콜백
-  const handleBonesFound = (bones: string[], mappings: BoneMapping[]) => {
+  // 본 발견 콜백 - 첫 로드 시에만 저장된 매핑 불러오기
+  const boneMappingLoadedRef = useRef(false)
+  const handleBonesFound = useCallback((bones: string[], mappings: BoneMapping[]) => {
     setAvailableBones(bones)
     setCurrentBoneMappings(mappings)
 
-    // 저장된 매핑이 있으면 불러오기
-    if (externalModelName) {
+    // 저장된 매핑은 첫 로드 시에만 불러오기 (무한 루프 방지)
+    if (externalModelName && !boneMappingLoadedRef.current) {
+      boneMappingLoadedRef.current = true
       const savedMapping = loadBoneMapping(externalModelName)
       if (savedMapping) {
         setCustomBoneMapping(savedMapping.mappings)
         toast.success('저장된 본 매핑을 불러왔습니다')
       }
     }
-  }
+  }, [externalModelName])
 
   // 본 매핑 변경
   const handleBoneMappingChange = (jointKey: HumanoidJointKey, boneName: string) => {
@@ -767,6 +775,21 @@ export default function Home() {
     }
     saveBoneMapping(externalModelName, customBoneMapping)
     toast.success('본 매핑이 저장되었습니다!')
+  }
+
+  // 전체 자동 매핑
+  const handleAutoMapAll = () => {
+    if (currentBoneMappings.length === 0) {
+      toast.error('매핑할 본이 없습니다')
+      return
+    }
+
+    const newMapping: Record<HumanoidJointKey, string> = {} as Record<HumanoidJointKey, string>
+    for (const mapping of currentBoneMappings) {
+      newMapping[mapping.jointKey] = mapping.boneName
+    }
+    setCustomBoneMapping(newMapping)
+    toast.success(`${currentBoneMappings.length}개 관절이 자동 매핑되었습니다`)
   }
 
   // 본 매핑 테스트
@@ -996,12 +1019,18 @@ export default function Home() {
               </div>
               {/* 외부 모델일 때 본 매핑 버튼들 */}
               {modelType === 'external' && externalModelUrl && (
-                <div className="flex gap-1 mt-2">
+                <div className="flex flex-wrap gap-1 mt-2">
                   <button
                     onClick={() => setShowBoneMappingPanel(!showBoneMappingPanel)}
                     className="px-2 py-1 text-xs rounded bg-cyan-600 hover:bg-cyan-700 text-white"
                   >
                     본 매핑 ({currentBoneMappings.length})
+                  </button>
+                  <button
+                    onClick={handleAutoMapAll}
+                    className="px-2 py-1 text-xs rounded bg-indigo-600 hover:bg-indigo-700 text-white"
+                  >
+                    전체 매핑
                   </button>
                   <button
                     onClick={handleSaveBoneMapping}
@@ -1105,10 +1134,16 @@ export default function Home() {
 
                 <div className="flex gap-2 mt-4">
                   <button
+                    onClick={handleAutoMapAll}
+                    className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded"
+                  >
+                    전체 매핑
+                  </button>
+                  <button
                     onClick={handleSaveBoneMapping}
                     className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded"
                   >
-                    동기화 저장
+                    동기화
                   </button>
                   <button
                     onClick={handleTestBoneMapping}
