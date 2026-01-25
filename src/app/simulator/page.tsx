@@ -54,6 +54,8 @@ export default function Home() {
   const [executionSpeed, setExecutionSpeed] = useState(1) // 0.25 ~ 4x 속도
   const [editorMode, setEditorMode] = useState<EditorMode>('block')
   const [pythonCode, setPythonCode] = useState('')
+  const [externalModelUrl, setExternalModelUrl] = useState<string>('')
+  const [showExternalModelDialog, setShowExternalModelDialog] = useState(false)
 
   const animationController = useRef(new AnimationController())
   const executionSpeedRef = useRef(executionSpeed)
@@ -653,6 +655,28 @@ export default function Home() {
     }
   }
 
+  // 외부 GLB 파일 로드
+  const handleExternalModelLoad = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const url = URL.createObjectURL(file)
+      setExternalModelUrl(url)
+      setModelType('external')
+      setShowExternalModelDialog(false)
+      toast.success(`"${file.name}" 모델을 불러왔습니다!`)
+    }
+  }
+
+  // URL로 외부 모델 로드
+  const handleExternalModelUrlLoad = (url: string) => {
+    if (url) {
+      setExternalModelUrl(url)
+      setModelType('external')
+      setShowExternalModelDialog(false)
+      toast.success('외부 모델을 불러왔습니다!')
+    }
+  }
+
   return (
     <main className="flex h-screen flex-col bg-gray-900">
       <header className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
@@ -789,12 +813,17 @@ export default function Home() {
           isWorkspaceMinimized ? 'flex-1' : 'w-1/2'
         }`}>
           <div className="flex-1 relative">
-            <RobotScene jointAngles={jointAngles} modelType={modelType} position={robotPosition} />
+            <RobotScene
+              jointAngles={jointAngles}
+              modelType={modelType}
+              position={robotPosition}
+              externalModelUrl={externalModelUrl}
+            />
 
             <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-sm px-4 py-2 rounded-lg">
               <p className="text-white text-sm font-medium">3D 시뮬레이션</p>
               <p className="text-gray-300 text-xs">마우스로 회전/확대</p>
-              <div className="flex gap-1 mt-2">
+              <div className="flex flex-wrap gap-1 mt-2">
                 <button
                   onClick={() => setModelType('gundam')}
                   className={`px-2 py-1 text-xs rounded ${
@@ -824,6 +853,16 @@ export default function Home() {
                   }`}
                 >
                   Robot
+                </button>
+                <button
+                  onClick={() => setShowExternalModelDialog(true)}
+                  className={`px-2 py-1 text-xs rounded ${
+                    modelType === 'external'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  외부 모델
                 </button>
               </div>
             </div>
@@ -877,6 +916,75 @@ export default function Home() {
         examples={EXAMPLE_PROGRAMS}
         onLoad={handleLoadExample}
       />
+
+      {/* 외부 모델 불러오기 다이얼로그 */}
+      {showExternalModelDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-xl p-6 w-96 border border-gray-700">
+            <h2 className="text-xl font-bold text-white mb-4">외부 모델 불러오기</h2>
+
+            <div className="space-y-4">
+              {/* 파일 업로드 */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">GLB 파일 선택</label>
+                <input
+                  type="file"
+                  accept=".glb,.gltf"
+                  onChange={handleExternalModelLoad}
+                  className="w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-purple-600 file:text-white hover:file:bg-purple-700 file:cursor-pointer"
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-gray-600" />
+                <span className="text-gray-500 text-sm">또는</span>
+                <div className="flex-1 h-px bg-gray-600" />
+              </div>
+
+              {/* URL 입력 */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">URL로 불러오기</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="https://example.com/model.glb"
+                    className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleExternalModelUrlLoad((e.target as HTMLInputElement).value)
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={(e) => {
+                      const input = (e.target as HTMLElement).parentElement?.querySelector('input')
+                      if (input) handleExternalModelUrlLoad(input.value)
+                    }}
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm"
+                  >
+                    불러오기
+                  </button>
+                </div>
+              </div>
+
+              {externalModelUrl && (
+                <div className="text-sm text-green-400">
+                  현재 로드된 모델이 있습니다
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setShowExternalModelDialog(false)}
+                className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
