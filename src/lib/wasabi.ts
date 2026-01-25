@@ -11,7 +11,7 @@ const wasabiClient = new S3Client({
   },
 })
 
-const BUCKET_NAME = process.env.WASABI_BUCKET || 'robot-bone-mappings'
+const BUCKET_NAME = process.env.WASABI_BUCKET || 'robot2026'
 const MAPPINGS_PREFIX = 'bone-mappings/'
 
 export interface WasabiBoneMapping {
@@ -267,6 +267,50 @@ export async function deleteCreatorModel(id: string, modelType: 'outfit' | 'acce
     return true
   } catch (error) {
     console.error('Wasabi 모델 삭제 오류:', error)
+    return false
+  }
+}
+
+// Wasabi 파일 직접 가져오기 (프록시용)
+export async function getWasabiFile(key: string): Promise<{ data: Buffer; contentType: string } | null> {
+  try {
+    const response = await wasabiClient.send(new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    }))
+
+    if (response.Body) {
+      const data = await response.Body.transformToByteArray()
+      const contentType = response.ContentType || 'application/octet-stream'
+      return { data: Buffer.from(data), contentType }
+    }
+
+    return null
+  } catch (error: any) {
+    if (error.name === 'NoSuchKey') {
+      return null
+    }
+    console.error('Wasabi 파일 가져오기 오류:', error)
+    return null
+  }
+}
+
+// 임의 파일 Wasabi에 업로드 (텍스처 등)
+export async function uploadFileToWasabi(
+  file: Buffer,
+  key: string,
+  contentType: string
+): Promise<boolean> {
+  try {
+    await wasabiClient.send(new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: file,
+      ContentType: contentType,
+    }))
+    return true
+  } catch (error) {
+    console.error('Wasabi 파일 업로드 오류:', error)
     return false
   }
 }

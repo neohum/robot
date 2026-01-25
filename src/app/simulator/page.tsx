@@ -540,28 +540,143 @@ export default function Home() {
   }
 
   // Python 코드 실행 (Python 문법을 JavaScript로 변환하여 실행)
+  // Python 코드를 JavaScript로 변환하는 함수
+  const convertPythonToJS = (pythonCode: string): string => {
+    let lines = pythonCode.split('\n')
+    let jsLines: string[] = []
+    let indentStack: number[] = [0] // 들여쓰기 스택
+
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i]
+
+      // 빈 줄 처리
+      if (line.trim() === '') {
+        jsLines.push('')
+        continue
+      }
+
+      // 현재 줄의 들여쓰기 레벨 계산
+      const currentIndent = line.search(/\S/)
+      if (currentIndent === -1) continue
+
+      // 들여쓰기가 줄어들면 중괄호 닫기
+      while (indentStack.length > 1 && currentIndent <= indentStack[indentStack.length - 1]) {
+        indentStack.pop()
+        jsLines.push(' '.repeat(indentStack[indentStack.length - 1]) + '}')
+      }
+
+      // 주석 변환 (# → //)
+      line = line.replace(/#(.*)$/, '//$1')
+
+      // True/False → true/false
+      line = line.replace(/\bTrue\b/g, 'true')
+      line = line.replace(/\bFalse\b/g, 'false')
+      line = line.replace(/\bNone\b/g, 'null')
+
+      // for i in range(n): → for (let i = 0; i < n; i++) {
+      const forRangeMatch = line.match(/^(\s*)for\s+(\w+)\s+in\s+range\(([^,)]+)(?:,\s*([^)]+))?\)\s*:?\s*$/)
+      if (forRangeMatch) {
+        const [, indent, varName, startOrEnd, maybeEnd] = forRangeMatch
+        if (maybeEnd) {
+          // range(start, end)
+          jsLines.push(`${indent}for (let ${varName} = ${startOrEnd}; ${varName} < ${maybeEnd}; ${varName}++) {`)
+        } else {
+          // range(end)
+          jsLines.push(`${indent}for (let ${varName} = 0; ${varName} < ${startOrEnd}; ${varName}++) {`)
+        }
+        indentStack.push(currentIndent + 2)
+        continue
+      }
+
+      // while condition: → while (condition) {
+      const whileMatch = line.match(/^(\s*)while\s+(.+?)\s*:\s*$/)
+      if (whileMatch) {
+        const [, indent, condition] = whileMatch
+        const jsCondition = condition.replace(/\band\b/g, '&&').replace(/\bor\b/g, '||').replace(/\bnot\b/g, '!')
+        jsLines.push(`${indent}while (${jsCondition}) {`)
+        indentStack.push(currentIndent + 2)
+        continue
+      }
+
+      // if condition: → if (condition) {
+      const ifMatch = line.match(/^(\s*)if\s+(.+?)\s*:\s*$/)
+      if (ifMatch) {
+        const [, indent, condition] = ifMatch
+        const jsCondition = condition.replace(/\band\b/g, '&&').replace(/\bor\b/g, '||').replace(/\bnot\b/g, '!')
+        jsLines.push(`${indent}if (${jsCondition}) {`)
+        indentStack.push(currentIndent + 2)
+        continue
+      }
+
+      // elif condition: → } else if (condition) {
+      const elifMatch = line.match(/^(\s*)elif\s+(.+?)\s*:\s*$/)
+      if (elifMatch) {
+        const [, indent, condition] = elifMatch
+        const jsCondition = condition.replace(/\band\b/g, '&&').replace(/\bor\b/g, '||').replace(/\bnot\b/g, '!')
+        // 이전 블록 닫기
+        if (indentStack.length > 1) {
+          indentStack.pop()
+          jsLines.push(`${indent}} else if (${jsCondition}) {`)
+          indentStack.push(currentIndent + 2)
+        }
+        continue
+      }
+
+      // else: → } else {
+      const elseMatch = line.match(/^(\s*)else\s*:\s*$/)
+      if (elseMatch) {
+        const [, indent] = elseMatch
+        if (indentStack.length > 1) {
+          indentStack.pop()
+          jsLines.push(`${indent}} else {`)
+          indentStack.push(currentIndent + 2)
+        }
+        continue
+      }
+
+      // 함수 이름 변환
+      line = line.replace(/rotate_joint/g, 'rotateJoint')
+      line = line.replace(/set_gripper/g, 'setGripper')
+      line = line.replace(/set_head_pose/g, 'setHeadPose')
+      line = line.replace(/set_arm_pose/g, 'setArmPose')
+      line = line.replace(/set_leg_pose/g, 'setLegPose')
+      line = line.replace(/set_preset_pose/g, 'setPresetPose')
+      line = line.replace(/reset_robot/g, 'resetRobot')
+      line = line.replace(/move_forward/g, 'moveForward')
+      line = line.replace(/move_backward/g, 'moveBackward')
+      line = line.replace(/move_left/g, 'moveLeft')
+      line = line.replace(/move_right/g, 'moveRight')
+      line = line.replace(/reset_position/g, 'resetPosition')
+
+      // 변수 선언 변환: count = 5 → let count = 5 (함수 호출이 아닌 경우)
+      const assignMatch = line.match(/^(\s*)(\w+)\s*=\s*(.+)$/)
+      if (assignMatch && !line.includes('await') && !line.includes('(')) {
+        const [, indent, varName, value] = assignMatch
+        jsLines.push(`${indent}let ${varName} = ${value}`)
+        continue
+      }
+
+      jsLines.push(line)
+    }
+
+    // 남은 블록 모두 닫기
+    while (indentStack.length > 1) {
+      indentStack.pop()
+      jsLines.push('}')
+    }
+
+    return jsLines.join('\n')
+  }
+
   const executePythonCode = async (code: string): Promise<void> => {
     stopRequestedRef.current = false
     animationController.current.reset()
     setIsRunning(true)
 
     try {
-      // Python await 문법을 JavaScript로 변환
-      // await function_name('arg1', arg2) -> await function_name('arg1', arg2)
-      // Python과 JavaScript 문법이 유사하므로 대부분 그대로 실행 가능
-      const jsCode = code
-        .replace(/rotate_joint/g, 'rotateJoint')
-        .replace(/set_gripper/g, 'setGripper')
-        .replace(/set_head_pose/g, 'setHeadPose')
-        .replace(/set_arm_pose/g, 'setArmPose')
-        .replace(/set_leg_pose/g, 'setLegPose')
-        .replace(/set_preset_pose/g, 'setPresetPose')
-        .replace(/reset_robot/g, 'resetRobot')
-        .replace(/move_forward/g, 'moveForward')
-        .replace(/move_backward/g, 'moveBackward')
-        .replace(/move_left/g, 'moveLeft')
-        .replace(/move_right/g, 'moveRight')
-        .replace(/reset_position/g, 'resetPosition')
+      // Python 코드를 JavaScript로 변환
+      const jsCode = convertPythonToJS(code)
+      console.log('변환된 JS 코드:', jsCode)
 
       const asyncFunction = new Function(
         'rotateJoint',

@@ -10,46 +10,26 @@ const CreatorScene = dynamic(
   { ssr: false }
 )
 
+const ModelPreview = dynamic(
+  () => import('@/components/Creator/ModelPreview'),
+  { ssr: false }
+)
+
 // 스켈레톤 타입 정의
 export type SkeletonType = 'humanSmall' | 'humanMedium' | 'humanLarge' | 'quadruped' | 'biped' | 'bird'
 
-// 탭 타입
-type TabType = 'skin' | 'outfit' | 'accessory' | 'external'
+// 탭 타입 (피부색, 의상, 악세서리)
+type TabType = 'skin' | 'outfit' | 'accessory'
 
 // 외부 모델 타입 (Wasabi에서 가져온 모델)
-interface ExternalModel {
+export interface ExternalModel {
   id: string
   name: string
   url: string
   type: 'outfit' | 'accessory'
   timestamp?: number
   size?: number
-  isLocal?: boolean // 로컬 업로드 (아직 저장 안됨)
 }
-
-// 무료 모델 다운로드 소스
-const MODEL_SOURCES = [
-  {
-    name: 'Kenney Modular Characters',
-    url: 'https://kenney.nl/assets/modular-characters',
-    description: '40개 악세서리 포함 (CC0)'
-  },
-  {
-    name: 'Sketchfab CC0',
-    url: 'https://sketchfab.com/tags/cc0',
-    description: 'CC0 라이센스 3D 모델'
-  },
-  {
-    name: 'Clothing Kit (CC0)',
-    url: 'https://sketchfab.com/3d-models/clothing-and-character-kit-10-cc0-7c733dceb2e04c4fb7e7dbd85316c1e7',
-    description: '캐릭터 의상 키트'
-  },
-  {
-    name: 'Quaternius',
-    url: 'https://quaternius.com/',
-    description: '무료 로우폴리 3D 에셋'
-  }
-]
 
 // 카테고리별 스켈레톤 분류
 const SKELETON_CATEGORIES = {
@@ -116,95 +96,25 @@ const SKIN_COLORS = [
   '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE'
 ]
 
-// 의상 스타일 (30가지)
-const OUTFIT_STYLES = [
-  { name: '기본', color: '#6B7280', type: 'basic' },
-  { name: '캐주얼', color: '#3B82F6', type: 'casual' },
-  { name: '정장', color: '#1F2937', type: 'formal' },
-  { name: '스포츠', color: '#EF4444', type: 'sport' },
-  { name: '군복', color: '#4B5320', type: 'military' },
-  { name: '우주복', color: '#F5F5F5', type: 'space' },
-  { name: '닌자', color: '#1A1A2E', type: 'ninja' },
-  { name: '기사', color: '#B8860B', type: 'knight' },
-  { name: '의사', color: '#FFFFFF', type: 'doctor' },
-  { name: '소방관', color: '#FF4500', type: 'firefighter' },
-  { name: '파일럿', color: '#2F4F4F', type: 'pilot' },
-  { name: '요리사', color: '#FFFAF0', type: 'chef' },
-  { name: '경찰', color: '#000080', type: 'police' },
-  { name: '해적', color: '#8B4513', type: 'pirate' },
-  { name: '사이버펑크', color: '#FF00FF', type: 'cyberpunk' },
-  { name: '스팀펑크', color: '#CD7F32', type: 'steampunk' },
-  { name: '미래전사', color: '#00CED1', type: 'futuristic' },
-  { name: '로봇슈트', color: '#708090', type: 'mech' },
-  { name: '운동선수', color: '#FF8C00', type: 'athlete' },
-  { name: '학생', color: '#4169E1', type: 'student' },
-  { name: '왕족', color: '#800080', type: 'royal' },
-  { name: '마법사', color: '#4B0082', type: 'wizard' },
-  { name: '사무라이', color: '#DC143C', type: 'samurai' },
-  { name: '바이킹', color: '#A0522D', type: 'viking' },
-  { name: '탐험가', color: '#D2691E', type: 'explorer' },
-  { name: '과학자', color: '#E0E0E0', type: 'scientist' },
-  { name: '레이서', color: '#FF1493', type: 'racer' },
-  { name: 'DJ', color: '#9400D3', type: 'dj' },
-  { name: '가수', color: '#FFD700', type: 'singer' },
-  { name: '슈퍼히어로', color: '#DC143C', type: 'hero' }
-]
-
-// 악세서리 옵션 (30가지)
-const ACCESSORY_OPTIONS = [
-  { name: '없음', icon: '∅', type: 'none' },
-  { name: '안경', icon: '👓', type: 'glasses' },
-  { name: '선글라스', icon: '🕶️', type: 'sunglasses' },
-  { name: '모자', icon: '🎩', type: 'hat' },
-  { name: '헬멧', icon: '⛑️', type: 'helmet' },
-  { name: '왕관', icon: '👑', type: 'crown' },
-  { name: '헤드폰', icon: '🎧', type: 'headphone' },
-  { name: '마스크', icon: '😷', type: 'mask' },
-  { name: '스카프', icon: '🧣', type: 'scarf' },
-  { name: '넥타이', icon: '👔', type: 'tie' },
-  { name: '시계', icon: '⌚', type: 'watch' },
-  { name: '팔찌', icon: '📿', type: 'bracelet' },
-  { name: '장갑', icon: '🧤', type: 'gloves' },
-  { name: '벨트', icon: '🎗️', type: 'belt' },
-  { name: '배낭', icon: '🎒', type: 'backpack' },
-  { name: '칼', icon: '⚔️', type: 'sword' },
-  { name: '방패', icon: '🛡️', type: 'shield' },
-  { name: '망토', icon: '🦸', type: 'cape' },
-  { name: '날개', icon: '🪽', type: 'wings' },
-  { name: '꼬리', icon: '🦊', type: 'tail' },
-  { name: '귀', icon: '🐱', type: 'ears' },
-  { name: '뿔', icon: '🦌', type: 'horns' },
-  { name: '후광', icon: '😇', type: 'halo' },
-  { name: '제트팩', icon: '🚀', type: 'jetpack' },
-  { name: '가방', icon: '👜', type: 'bag' },
-  { name: '카메라', icon: '📷', type: 'camera' },
-  { name: '마이크', icon: '🎤', type: 'microphone' },
-  { name: '우산', icon: '☂️', type: 'umbrella' },
-  { name: '지팡이', icon: '🪄', type: 'wand' },
-  { name: '악기', icon: '🎸', type: 'instrument' }
-]
-
-export interface CharacterConfig {
-  skinColorIndex: number
-  outfitIndex: number
-  accessoryIndices: number[]
-}
-
 export default function CreatorPage() {
   const [skeletonType, setSkeletonType] = useState<SkeletonType>('humanMedium')
   const [activeTab, setActiveTab] = useState<TabType>('skin')
-  const [characterConfig, setCharacterConfig] = useState<CharacterConfig>({
-    skinColorIndex: 0,
-    outfitIndex: 0,
-    accessoryIndices: []
-  })
+  const [skinColorIndex, setSkinColorIndex] = useState(0)
   const [modelName, setModelName] = useState('내 캐릭터')
   const [isExporting, setIsExporting] = useState(false)
-  const [externalModels, setExternalModels] = useState<ExternalModel[]>([])
-  const [selectedExternalModel, setSelectedExternalModel] = useState<ExternalModel | null>(null)
+
+  // 외부 모델 상태
+  const [allModels, setAllModels] = useState<ExternalModel[]>([])
+  const [selectedOutfit, setSelectedOutfit] = useState<ExternalModel | null>(null)
+  const [selectedAccessories, setSelectedAccessories] = useState<ExternalModel[]>([])
   const [isLoadingModels, setIsLoadingModels] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [uploadType, setUploadType] = useState<'outfit' | 'accessory'>('outfit')
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // 의상과 악세서리 모델 필터링
+  const outfitModels = allModels.filter(m => m.type === 'outfit')
+  const accessoryModels = allModels.filter(m => m.type === 'accessory')
 
   // Wasabi에서 저장된 모델 목록 불러오기
   const fetchSavedModels = useCallback(async () => {
@@ -213,7 +123,7 @@ export default function CreatorPage() {
       const response = await fetch('/api/creator-models')
       if (response.ok) {
         const models = await response.json()
-        setExternalModels(models.map((m: ExternalModel) => ({ ...m, isLocal: false })))
+        setAllModels(models)
       }
     } catch (error) {
       console.error('모델 목록 불러오기 실패:', error)
@@ -249,7 +159,7 @@ export default function CreatorPage() {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('type', 'accessory')
+      formData.append('type', uploadType)
 
       const response = await fetch('/api/creator-models', {
         method: 'POST',
@@ -260,12 +170,16 @@ export default function CreatorPage() {
 
       if (response.ok) {
         const data = await response.json()
-        const newModel: ExternalModel = {
-          ...data.model,
-          isLocal: false,
+        const newModel: ExternalModel = data.model
+        setAllModels(prev => [newModel, ...prev])
+
+        // 업로드한 모델 자동 선택
+        if (uploadType === 'outfit') {
+          setSelectedOutfit(newModel)
+        } else {
+          setSelectedAccessories(prev => [...prev, newModel])
         }
-        setExternalModels(prev => [newModel, ...prev])
-        setSelectedExternalModel(newModel)
+
         toast.success(`${file.name} Wasabi에 저장 완료!`)
       } else {
         const error = await response.json()
@@ -281,38 +195,27 @@ export default function CreatorPage() {
         fileInputRef.current.value = ''
       }
     }
-  }, [])
+  }, [uploadType])
 
-  // 외부 모델 제거 (Wasabi에서도 삭제)
-  const handleRemoveExternalModel = useCallback(async (id: string, type: 'outfit' | 'accessory') => {
-    const model = externalModels.find(m => m.id === id)
-    if (!model) return
-
-    // 로컬 blob URL인 경우 바로 제거
-    if (model.isLocal && model.url.startsWith('blob:')) {
-      URL.revokeObjectURL(model.url)
-      setExternalModels(prev => prev.filter(m => m.id !== id))
-      if (selectedExternalModel?.id === id) {
-        setSelectedExternalModel(null)
-      }
-      toast.success('모델 제거됨')
-      return
-    }
-
-    // Wasabi에서 삭제
+  // 모델 삭제 (Wasabi에서도 삭제)
+  const handleRemoveModel = useCallback(async (model: ExternalModel) => {
     toast.loading('삭제 중...')
     try {
-      const response = await fetch(`/api/creator-models?id=${encodeURIComponent(id)}&type=${type}`, {
+      const response = await fetch(`/api/creator-models?id=${encodeURIComponent(model.id)}&type=${model.type}`, {
         method: 'DELETE',
       })
 
       toast.dismiss()
 
       if (response.ok) {
-        setExternalModels(prev => prev.filter(m => m.id !== id))
-        if (selectedExternalModel?.id === id) {
-          setSelectedExternalModel(null)
+        setAllModels(prev => prev.filter(m => m.id !== model.id))
+
+        // 선택 해제
+        if (selectedOutfit?.id === model.id) {
+          setSelectedOutfit(null)
         }
+        setSelectedAccessories(prev => prev.filter(a => a.id !== model.id))
+
         toast.success('Wasabi에서 삭제됨')
       } else {
         toast.error('삭제 실패')
@@ -321,29 +224,17 @@ export default function CreatorPage() {
       toast.dismiss()
       toast.error('삭제 중 오류가 발생했습니다')
     }
-  }, [externalModels, selectedExternalModel])
+  }, [selectedOutfit])
 
-  const handleSkinColorSelect = (index: number) => {
-    setCharacterConfig(prev => ({ ...prev, skinColorIndex: index }))
-  }
-
-  const handleOutfitSelect = (index: number) => {
-    setCharacterConfig(prev => ({ ...prev, outfitIndex: index }))
-  }
-
-  const handleAccessoryToggle = (index: number) => {
-    setCharacterConfig(prev => {
-      const accessories = [...prev.accessoryIndices]
-      const existingIndex = accessories.indexOf(index)
-      if (existingIndex >= 0) {
-        accessories.splice(existingIndex, 1)
+  // 악세서리 토글
+  const handleAccessoryToggle = (model: ExternalModel) => {
+    setSelectedAccessories(prev => {
+      const exists = prev.find(a => a.id === model.id)
+      if (exists) {
+        return prev.filter(a => a.id !== model.id)
       } else {
-        if (index === 0) {
-          return { ...prev, accessoryIndices: [] }
-        }
-        accessories.push(index)
+        return [...prev, model]
       }
-      return { ...prev, accessoryIndices: accessories }
     })
   }
 
@@ -355,7 +246,7 @@ export default function CreatorPage() {
       detail: {
         name: modelName,
         skeleton: skeletonType,
-        config: characterConfig
+        skinColor: SKIN_COLORS[skinColorIndex]
       }
     })
     window.dispatchEvent(event)
@@ -368,13 +259,21 @@ export default function CreatorPage() {
   }
 
   const handleRandomize = () => {
-    setCharacterConfig({
-      skinColorIndex: Math.floor(Math.random() * SKIN_COLORS.length),
-      outfitIndex: Math.floor(Math.random() * OUTFIT_STYLES.length),
-      accessoryIndices: Array.from({ length: Math.floor(Math.random() * 3) + 1 }, () =>
-        Math.floor(Math.random() * (ACCESSORY_OPTIONS.length - 1)) + 1
-      )
-    })
+    setSkinColorIndex(Math.floor(Math.random() * SKIN_COLORS.length))
+
+    // 랜덤 의상 선택
+    if (outfitModels.length > 0) {
+      const randomOutfit = outfitModels[Math.floor(Math.random() * outfitModels.length)]
+      setSelectedOutfit(randomOutfit)
+    }
+
+    // 랜덤 악세서리 선택 (0~3개)
+    if (accessoryModels.length > 0) {
+      const count = Math.floor(Math.random() * Math.min(3, accessoryModels.length))
+      const shuffled = [...accessoryModels].sort(() => Math.random() - 0.5)
+      setSelectedAccessories(shuffled.slice(0, count))
+    }
+
     toast.success('랜덤 캐릭터 생성!')
   }
 
@@ -397,7 +296,7 @@ export default function CreatorPage() {
               캐릭터 만들기
             </h1>
             <p className="text-sm text-gray-400 mt-1">
-              체형, 피부색, 의상을 선택하여 나만의 캐릭터를 만드세요
+              체형, 피부색을 선택하고 외부 모델로 의상/악세서리를 장착하세요
             </p>
           </div>
         </div>
@@ -509,22 +408,20 @@ export default function CreatorPage() {
               <div className="flex items-center gap-2">
                 <div
                   className="w-4 h-4 rounded-full border border-gray-500"
-                  style={{ backgroundColor: SKIN_COLORS[characterConfig.skinColorIndex] }}
+                  style={{ backgroundColor: SKIN_COLORS[skinColorIndex] }}
                 />
                 <span className="text-gray-300">피부</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-4 h-4 rounded border border-gray-500"
-                  style={{ backgroundColor: OUTFIT_STYLES[characterConfig.outfitIndex].color }}
-                />
-                <span className="text-gray-300">{OUTFIT_STYLES[characterConfig.outfitIndex].name}</span>
-              </div>
-              {characterConfig.accessoryIndices.length > 0 && (
+              {selectedOutfit && (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-green-500" />
+                  <span className="text-gray-300 truncate text-xs">{selectedOutfit.name}</span>
+                </div>
+              )}
+              {selectedAccessories.length > 0 && (
                 <div className="flex items-center gap-1 flex-wrap">
-                  {characterConfig.accessoryIndices.map(idx => (
-                    <span key={idx} className="text-lg">{ACCESSORY_OPTIONS[idx].icon}</span>
-                  ))}
+                  <span className="text-gray-400 text-xs">악세서리:</span>
+                  <span className="text-gray-300 text-xs">{selectedAccessories.length}개</span>
                 </div>
               )}
             </div>
@@ -540,10 +437,9 @@ export default function CreatorPage() {
           }>
             <CreatorScene
               skeletonType={skeletonType}
-              skinColor={SKIN_COLORS[characterConfig.skinColorIndex]}
-              outfitStyle={OUTFIT_STYLES[characterConfig.outfitIndex]}
-              accessories={characterConfig.accessoryIndices.map(idx => ACCESSORY_OPTIONS[idx])}
-              externalModelUrl={selectedExternalModel?.url}
+              skinColor={SKIN_COLORS[skinColorIndex]}
+              outfitModelUrl={selectedOutfit?.url}
+              accessoryModelUrls={selectedAccessories.map(a => a.url)}
             />
           </Suspense>
 
@@ -571,31 +467,27 @@ export default function CreatorPage() {
               onClick={() => setActiveTab('outfit')}
               className={`flex-1 py-3 text-sm font-medium transition-colors ${
                 activeTab === 'outfit'
-                  ? 'text-white border-b-2 border-purple-500'
+                  ? 'text-white border-b-2 border-green-500'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
               의상
+              {outfitModels.length > 0 && (
+                <span className="ml-1 text-xs bg-gray-600 px-1.5 py-0.5 rounded">{outfitModels.length}</span>
+              )}
             </button>
             <button
               onClick={() => setActiveTab('accessory')}
               className={`flex-1 py-3 text-sm font-medium transition-colors ${
                 activeTab === 'accessory'
-                  ? 'text-white border-b-2 border-purple-500'
+                  ? 'text-white border-b-2 border-blue-500'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
               악세서리
-            </button>
-            <button
-              onClick={() => setActiveTab('external')}
-              className={`flex-1 py-3 text-sm font-medium transition-colors ${
-                activeTab === 'external'
-                  ? 'text-white border-b-2 border-green-500'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              외부
+              {accessoryModels.length > 0 && (
+                <span className="ml-1 text-xs bg-gray-600 px-1.5 py-0.5 rounded">{accessoryModels.length}</span>
+              )}
             </button>
           </div>
 
@@ -608,16 +500,16 @@ export default function CreatorPage() {
                   {SKIN_COLORS.map((color, i) => (
                     <button
                       key={i}
-                      onClick={() => handleSkinColorSelect(i)}
+                      onClick={() => setSkinColorIndex(i)}
                       className={`aspect-square rounded-lg transition-all ${
-                        characterConfig.skinColorIndex === i
+                        skinColorIndex === i
                           ? 'ring-2 ring-white scale-110 z-10'
                           : 'hover:scale-105'
                       }`}
                       style={{ backgroundColor: color }}
                       title={`색상 ${i + 1}`}
                     >
-                      {characterConfig.skinColorIndex === i && (
+                      {skinColorIndex === i && (
                         <div className="w-full h-full flex items-center justify-center">
                           <svg className="w-4 h-4 text-gray-800 drop-shadow-lg" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
@@ -631,60 +523,10 @@ export default function CreatorPage() {
             )}
 
             {activeTab === 'outfit' && (
-              <div>
-                <p className="text-gray-400 text-xs mb-3">30가지 의상 중 선택하세요</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {OUTFIT_STYLES.map((outfit, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleOutfitSelect(i)}
-                      className={`p-3 rounded-lg text-left transition-all ${
-                        characterConfig.outfitIndex === i
-                          ? 'bg-purple-600 text-white ring-2 ring-purple-400'
-                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-6 h-6 rounded border border-gray-500"
-                          style={{ backgroundColor: outfit.color }}
-                        />
-                        <span className="text-sm">{outfit.name}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'accessory' && (
-              <div>
-                <p className="text-gray-400 text-xs mb-3">악세서리를 선택하세요 (복수 선택 가능)</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {ACCESSORY_OPTIONS.map((acc, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleAccessoryToggle(i)}
-                      className={`p-3 rounded-lg text-center transition-all ${
-                        (i === 0 && characterConfig.accessoryIndices.length === 0) ||
-                        characterConfig.accessoryIndices.includes(i)
-                          ? 'bg-purple-600 text-white ring-2 ring-purple-400'
-                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                      }`}
-                    >
-                      <div className="text-2xl mb-1">{acc.icon}</div>
-                      <div className="text-xs">{acc.name}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'external' && (
               <div className="space-y-4">
-                {/* 파일 업로드 */}
+                {/* 업로드 버튼 */}
                 <div>
-                  <p className="text-gray-400 text-xs mb-3">GLB 파일을 Wasabi 클라우드에 저장합니다</p>
+                  <p className="text-gray-400 text-xs mb-3">의상 GLB 모델을 업로드하세요</p>
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -694,33 +536,25 @@ export default function CreatorPage() {
                     disabled={isUploading}
                   />
                   <button
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => {
+                      setUploadType('outfit')
+                      fileInputRef.current?.click()
+                    }}
                     disabled={isUploading}
-                    className="w-full p-4 border-2 border-dashed border-gray-600 rounded-lg hover:border-green-500 hover:bg-gray-700/50 transition-all text-gray-400 hover:text-green-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full p-3 border-2 border-dashed border-gray-600 rounded-lg hover:border-green-500 hover:bg-gray-700/50 transition-all text-gray-400 hover:text-green-400 disabled:opacity-50"
                   >
-                    {isUploading ? (
-                      <>
-                        <svg className="w-8 h-8 mx-auto mb-2 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span className="text-sm">업로드 중...</span>
-                      </>
+                    {isUploading && uploadType === 'outfit' ? (
+                      <span className="text-sm">업로드 중...</span>
                     ) : (
-                      <>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                        </svg>
-                        <span className="text-sm">GLB 파일 업로드 (Wasabi 저장)</span>
-                      </>
+                      <span className="text-sm">+ 의상 GLB 업로드</span>
                     )}
                   </button>
                 </div>
 
-                {/* Wasabi에 저장된 모델 목록 */}
+                {/* 의상 모델 목록 */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-white text-sm font-medium">저장된 모델 (Wasabi)</h4>
+                    <h4 className="text-white text-sm font-medium">의상 목록</h4>
                     <button
                       onClick={fetchSavedModels}
                       disabled={isLoadingModels}
@@ -730,44 +564,45 @@ export default function CreatorPage() {
                     </button>
                   </div>
 
+                  {/* 선택 해제 버튼 */}
+                  {selectedOutfit && (
+                    <button
+                      onClick={() => setSelectedOutfit(null)}
+                      className="w-full p-2 mb-2 bg-gray-700 text-gray-400 rounded-lg text-sm hover:bg-gray-600"
+                    >
+                      의상 해제
+                    </button>
+                  )}
+
                   {isLoadingModels ? (
-                    <div className="text-center py-4 text-gray-500">
-                      <svg className="w-6 h-6 mx-auto animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <p className="mt-2 text-xs">로딩 중...</p>
-                    </div>
-                  ) : externalModels.length > 0 ? (
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {externalModels.map((model) => (
+                    <div className="text-center py-4 text-gray-500 text-xs">로딩 중...</div>
+                  ) : outfitModels.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      {outfitModels.map((model) => (
                         <div
                           key={model.id}
-                          className={`p-3 rounded-lg flex items-center justify-between ${
-                            selectedExternalModel?.id === model.id
-                              ? 'bg-green-600 text-white'
-                              : 'bg-gray-700 text-gray-300'
+                          className={`p-2 rounded-lg flex flex-col items-center cursor-pointer transition-all ${
+                            selectedOutfit?.id === model.id
+                              ? 'bg-green-600 text-white ring-2 ring-green-400'
+                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                           }`}
+                          onClick={() => setSelectedOutfit(
+                            selectedOutfit?.id === model.id ? null : model
+                          )}
                         >
+                          <div className="mb-2">
+                            <ModelPreview url={model.url} size={70} isSelected={selectedOutfit?.id === model.id} />
+                          </div>
+                          <span className="text-xs font-medium text-center truncate w-full">{model.name}</span>
                           <button
-                            onClick={() => setSelectedExternalModel(
-                              selectedExternalModel?.id === model.id ? null : model
-                            )}
-                            className="flex-1 text-left truncate"
-                          >
-                            <span className="text-sm font-medium">{model.name}</span>
-                            {model.size && (
-                              <span className="text-xs opacity-75 ml-2">
-                                ({(model.size / 1024 / 1024).toFixed(1)}MB)
-                              </span>
-                            )}
-                          </button>
-                          <button
-                            onClick={() => handleRemoveExternalModel(model.id, model.type)}
-                            className="p-1 hover:bg-red-500 rounded transition-colors ml-2"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleRemoveModel(model)
+                            }}
+                            className="mt-1 p-1 hover:bg-red-500 rounded transition-colors text-gray-400 hover:text-white"
                             title="삭제"
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
                           </button>
@@ -776,36 +611,94 @@ export default function CreatorPage() {
                     </div>
                   ) : (
                     <div className="text-center py-4 text-gray-500">
-                      <p className="text-xs">저장된 모델이 없습니다</p>
+                      <p className="text-xs">의상 모델이 없습니다</p>
                       <p className="text-xs mt-1">GLB 파일을 업로드하세요</p>
                     </div>
                   )}
                 </div>
 
-                {/* 무료 모델 다운로드 소스 */}
-                <div className="border-t border-gray-700 pt-4">
-                  <h4 className="text-white text-sm font-medium mb-2">무료 모델 다운로드</h4>
-                  <p className="text-gray-500 text-xs mb-3">아래 사이트에서 CC0 라이센스 GLB 모델을 다운로드 후 업로드하세요</p>
-                  <div className="space-y-2">
-                    {MODEL_SOURCES.map((source, i) => (
-                      <a
-                        key={i}
-                        href={source.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block p-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-white text-sm font-medium">{source.name}</span>
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                        </div>
-                        <p className="text-gray-400 text-xs mt-1">{source.description}</p>
-                      </a>
-                    ))}
-                  </div>
+              </div>
+            )}
+
+            {activeTab === 'accessory' && (
+              <div className="space-y-4">
+                {/* 업로드 버튼 */}
+                <div>
+                  <p className="text-gray-400 text-xs mb-3">악세서리 GLB 모델을 업로드하세요 (복수 선택 가능)</p>
+                  <button
+                    onClick={() => {
+                      setUploadType('accessory')
+                      fileInputRef.current?.click()
+                    }}
+                    disabled={isUploading}
+                    className="w-full p-3 border-2 border-dashed border-gray-600 rounded-lg hover:border-blue-500 hover:bg-gray-700/50 transition-all text-gray-400 hover:text-blue-400 disabled:opacity-50"
+                  >
+                    {isUploading && uploadType === 'accessory' ? (
+                      <span className="text-sm">업로드 중...</span>
+                    ) : (
+                      <span className="text-sm">+ 악세서리 GLB 업로드</span>
+                    )}
+                  </button>
                 </div>
+
+                {/* 악세서리 모델 목록 */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-white text-sm font-medium">악세서리 목록</h4>
+                    {selectedAccessories.length > 0 && (
+                      <button
+                        onClick={() => setSelectedAccessories([])}
+                        className="text-xs text-gray-400 hover:text-white"
+                      >
+                        전체 해제
+                      </button>
+                    )}
+                  </div>
+
+                  {isLoadingModels ? (
+                    <div className="text-center py-4 text-gray-500 text-xs">로딩 중...</div>
+                  ) : accessoryModels.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      {accessoryModels.map((model) => {
+                        const isSelected = selectedAccessories.some(a => a.id === model.id)
+                        return (
+                          <div
+                            key={model.id}
+                            className={`p-2 rounded-lg flex flex-col items-center cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-blue-600 text-white ring-2 ring-blue-400'
+                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                            }`}
+                            onClick={() => handleAccessoryToggle(model)}
+                          >
+                            <div className="mb-2">
+                              <ModelPreview url={model.url} size={70} isSelected={isSelected} />
+                            </div>
+                            <span className="text-xs font-medium text-center truncate w-full">{model.name}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleRemoveModel(model)
+                              }}
+                              className="mt-1 p-1 hover:bg-red-500 rounded transition-colors text-gray-400 hover:text-white"
+                              title="삭제"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500">
+                      <p className="text-xs">악세서리 모델이 없습니다</p>
+                      <p className="text-xs mt-1">GLB 파일을 업로드하세요</p>
+                    </div>
+                  )}
+                </div>
+
               </div>
             )}
           </div>

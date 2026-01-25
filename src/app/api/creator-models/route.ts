@@ -3,9 +3,13 @@ import {
   uploadModelToWasabi,
   listCreatorModels,
   deleteCreatorModel,
-  getModelDownloadUrl,
   WasabiCreatorModel
 } from '@/lib/wasabi'
+
+// 프록시 URL 생성 (presigned URL 대신 프록시 사용)
+function getProxyUrl(id: string, modelType: 'outfit' | 'accessory'): string {
+  return `/api/wasabi-proxy/creator-models/${modelType}s/${id}`
+}
 
 // GET: 모델 목록 조회 또는 다운로드 URL 가져오기
 export async function GET(request: NextRequest) {
@@ -17,23 +21,18 @@ export async function GET(request: NextRequest) {
 
     // 특정 모델의 다운로드 URL 요청
     if (modelId && modelType && action === 'download') {
-      const url = await getModelDownloadUrl(modelId, modelType)
-      if (url) {
-        return NextResponse.json({ url })
-      }
-      return NextResponse.json({ error: '다운로드 URL을 생성할 수 없습니다.' }, { status: 404 })
+      const url = getProxyUrl(modelId, modelType)
+      return NextResponse.json({ url })
     }
 
     // 모델 목록 조회
     const models = await listCreatorModels(modelType || undefined)
 
-    // 각 모델에 다운로드 URL 추가
-    const modelsWithUrls: WasabiCreatorModel[] = await Promise.all(
-      models.map(async (model) => {
-        const url = await getModelDownloadUrl(model.id, model.type)
-        return { ...model, url: url || undefined }
-      })
-    )
+    // 각 모델에 프록시 URL 추가
+    const modelsWithUrls: WasabiCreatorModel[] = models.map((model) => {
+      const url = getProxyUrl(model.id, model.type)
+      return { ...model, url }
+    })
 
     return NextResponse.json(modelsWithUrls)
   } catch (error) {
@@ -74,8 +73,8 @@ export async function POST(request: NextRequest) {
     const result = await uploadModelToWasabi(buffer, file.name, modelType)
 
     if (result) {
-      // 다운로드 URL도 함께 반환
-      const url = await getModelDownloadUrl(result.id, result.type)
+      // 프록시 URL 반환
+      const url = getProxyUrl(result.id, result.type)
       return NextResponse.json({ success: true, model: { ...result, url } })
     } else {
       return NextResponse.json({ error: '업로드에 실패했습니다.' }, { status: 500 })
