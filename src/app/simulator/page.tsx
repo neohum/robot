@@ -10,7 +10,8 @@ import type { ModelType } from '@/components/Scene/RobotScene'
 import { AnimationController } from '@/lib/animationController'
 import { generateCode } from '@/lib/blockly/codeGenerator'
 import { generatePythonCode } from '@/lib/blockly/pythonGenerator'
-import { saveProject, loadProject, getAllProjects, deleteProject, saveCurrentWorkspace, loadCurrentWorkspace, SavedProject, saveExternalModel, getAllExternalModels, deleteExternalModel, loadCurrentExternalModel, saveCurrentExternalModel, testExternalModelSync, SavedExternalModel } from '@/lib/storage'
+import { saveProject, loadProject, getAllProjects, deleteProject, saveCurrentWorkspace, loadCurrentWorkspace, SavedProject, saveExternalModel, getAllExternalModels, deleteExternalModel, loadCurrentExternalModel, saveCurrentExternalModel, testExternalModelSync, SavedExternalModel, saveBoneMapping, loadBoneMapping, SavedBoneMapping } from '@/lib/storage'
+import type { BoneMapping } from '@/components/ExternalModel/ExternalModel'
 import { EXAMPLE_PROGRAMS } from '@/lib/examples'
 import ControlPanel from '@/components/Controls/ControlPanel'
 import HumanoidJointControlPanel from '@/components/Controls/HumanoidJointControlPanel'
@@ -59,6 +60,12 @@ export default function Home() {
   const [showExternalModelDialog, setShowExternalModelDialog] = useState(false)
   const [savedExternalModels, setSavedExternalModels] = useState<SavedExternalModel[]>([])
   const [syncTestResult, setSyncTestResult] = useState<string>('')
+  const [showBoneMappingPanel, setShowBoneMappingPanel] = useState(false)
+  const [availableBones, setAvailableBones] = useState<string[]>([])
+  const [currentBoneMappings, setCurrentBoneMappings] = useState<BoneMapping[]>([])
+  const [customBoneMapping, setCustomBoneMapping] = useState<Record<HumanoidJointKey, string>>({} as Record<HumanoidJointKey, string>)
+  const [mappingTestResult, setMappingTestResult] = useState<string>('')
+  const [isMappingTesting, setIsMappingTesting] = useState(false)
 
   const animationController = useRef(new AnimationController())
   const executionSpeedRef = useRef(executionSpeed)
@@ -729,6 +736,74 @@ export default function Home() {
     }
   }
 
+  // 본 발견 콜백
+  const handleBonesFound = (bones: string[], mappings: BoneMapping[]) => {
+    setAvailableBones(bones)
+    setCurrentBoneMappings(mappings)
+
+    // 저장된 매핑이 있으면 불러오기
+    if (externalModelName) {
+      const savedMapping = loadBoneMapping(externalModelName)
+      if (savedMapping) {
+        setCustomBoneMapping(savedMapping.mappings)
+        toast.success('저장된 본 매핑을 불러왔습니다')
+      }
+    }
+  }
+
+  // 본 매핑 변경
+  const handleBoneMappingChange = (jointKey: HumanoidJointKey, boneName: string) => {
+    setCustomBoneMapping(prev => ({
+      ...prev,
+      [jointKey]: boneName
+    }))
+  }
+
+  // 본 매핑 저장 (동기화)
+  const handleSaveBoneMapping = () => {
+    if (!externalModelName) {
+      toast.error('모델 이름이 없습니다')
+      return
+    }
+    saveBoneMapping(externalModelName, customBoneMapping)
+    toast.success('본 매핑이 저장되었습니다!')
+  }
+
+  // 본 매핑 테스트
+  const handleTestBoneMapping = async () => {
+    setIsMappingTesting(true)
+    setMappingTestResult('테스트 중...')
+
+    try {
+      // 테스트 동작: 각 관절을 순서대로 움직임
+      const testJoints: HumanoidJointKey[] = [
+        'neckYaw', 'leftShoulderPitch', 'rightShoulderPitch',
+        'leftElbow', 'rightElbow', 'leftHipPitch', 'rightHipPitch'
+      ]
+
+      for (const joint of testJoints) {
+        if (stopRequestedRef.current) break
+
+        // 관절을 30도로 움직임
+        await rotateJoint(joint, 30)
+        await wait(0.3)
+        // 원위치
+        await rotateJoint(joint, 0)
+        await wait(0.2)
+      }
+
+      setMappingTestResult(`테스트 완료! 매핑된 관절: ${currentBoneMappings.length}개`)
+      toast.success('본 매핑 테스트 완료!')
+    } catch (error) {
+      if ((error as Error).message !== 'STOP_REQUESTED') {
+        setMappingTestResult('테스트 실패: ' + (error as Error).message)
+        toast.error('테스트 중 오류 발생')
+      }
+    }
+
+    setIsMappingTesting(false)
+  }
+
   return (
     <main className="flex h-screen flex-col bg-gray-900">
       <header className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
@@ -870,6 +945,8 @@ export default function Home() {
               modelType={modelType}
               position={robotPosition}
               externalModelUrl={externalModelUrl}
+              onBonesFound={handleBonesFound}
+              customBoneMapping={Object.keys(customBoneMapping).length > 0 ? customBoneMapping : undefined}
             />
 
             <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-sm px-4 py-2 rounded-lg">
@@ -917,6 +994,30 @@ export default function Home() {
                   외부 모델
                 </button>
               </div>
+              {/* 외부 모델일 때 본 매핑 버튼들 */}
+              {modelType === 'external' && externalModelUrl && (
+                <div className="flex gap-1 mt-2">
+                  <button
+                    onClick={() => setShowBoneMappingPanel(!showBoneMappingPanel)}
+                    className="px-2 py-1 text-xs rounded bg-cyan-600 hover:bg-cyan-700 text-white"
+                  >
+                    본 매핑 ({currentBoneMappings.length})
+                  </button>
+                  <button
+                    onClick={handleSaveBoneMapping}
+                    className="px-2 py-1 text-xs rounded bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    동기화
+                  </button>
+                  <button
+                    onClick={handleTestBoneMapping}
+                    disabled={isMappingTesting}
+                    className="px-2 py-1 text-xs rounded bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 text-white"
+                  >
+                    {isMappingTesting ? '테스트중...' : '테스트'}
+                  </button>
+                </div>
+              )}
             </div>
 
             {isRunning && (
@@ -937,6 +1038,88 @@ export default function Home() {
                 disabled={isRunning}
               />
             </div>
+
+            {/* 본 매핑 패널 */}
+            {showBoneMappingPanel && modelType === 'external' && (
+              <div className="absolute top-4 left-4 w-80 max-h-[60vh] overflow-y-auto bg-gray-800/95 backdrop-blur-sm rounded-lg border border-gray-700 p-4" style={{ left: '200px' }}>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-white font-semibold">본 매핑 설정</h3>
+                  <button
+                    onClick={() => setShowBoneMappingPanel(false)}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="text-xs text-gray-400 mb-3">
+                  모델: {externalModelName || '알 수 없음'}<br />
+                  발견된 본: {availableBones.length}개 | 매핑됨: {currentBoneMappings.length}개
+                </div>
+
+                {mappingTestResult && (
+                  <div className={`text-xs mb-3 p-2 rounded ${mappingTestResult.includes('완료') ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400'}`}>
+                    {mappingTestResult}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  {/* 관절 그룹별로 표시 */}
+                  {[
+                    { label: '머리/몸통', joints: ['torso', 'neckYaw', 'neckPitch'] as HumanoidJointKey[] },
+                    { label: '왼팔', joints: ['leftShoulderPitch', 'leftShoulderYaw', 'leftElbow', 'leftWrist', 'leftGrip'] as HumanoidJointKey[] },
+                    { label: '오른팔', joints: ['rightShoulderPitch', 'rightShoulderYaw', 'rightElbow', 'rightWrist', 'rightGrip'] as HumanoidJointKey[] },
+                    { label: '왼다리', joints: ['leftHipPitch', 'leftHipYaw', 'leftKnee', 'leftAnkle'] as HumanoidJointKey[] },
+                    { label: '오른다리', joints: ['rightHipPitch', 'rightHipYaw', 'rightKnee', 'rightAnkle'] as HumanoidJointKey[] },
+                  ].map(group => (
+                    <div key={group.label} className="border-b border-gray-700 pb-2">
+                      <div className="text-xs text-cyan-400 font-medium mb-1">{group.label}</div>
+                      {group.joints.map(jointKey => {
+                        const currentMapping = currentBoneMappings.find(m => m.jointKey === jointKey)
+                        const selectedBone = customBoneMapping[jointKey] || currentMapping?.boneName || ''
+
+                        return (
+                          <div key={jointKey} className="flex items-center gap-2 mb-1">
+                            <span className="text-xs text-gray-400 w-24 truncate" title={jointKey}>
+                              {jointKey}
+                            </span>
+                            <select
+                              value={selectedBone}
+                              onChange={(e) => handleBoneMappingChange(jointKey, e.target.value)}
+                              className="flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-500"
+                            >
+                              <option value="">-- 선택 안함 --</option>
+                              {availableBones.map(bone => (
+                                <option key={bone} value={bone}>{bone}</option>
+                              ))}
+                            </select>
+                            {selectedBone && (
+                              <span className="text-green-400 text-xs">✓</span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={handleSaveBoneMapping}
+                    className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded"
+                  >
+                    동기화 저장
+                  </button>
+                  <button
+                    onClick={handleTestBoneMapping}
+                    disabled={isMappingTesting}
+                    className="flex-1 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 text-white text-sm rounded"
+                  >
+                    {isMappingTesting ? '테스트중...' : '테스트'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="h-48 bg-gray-800 border-t border-gray-700 p-4 overflow-auto">
