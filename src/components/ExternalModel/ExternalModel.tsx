@@ -400,7 +400,20 @@ export default function ExternalModel({
     // onBonesFound를 여기서 호출하지 않음 - 부모에서 이미 상태를 알고 있음
   }, [customBoneMapping, model, recalculateBoneMappings])
 
+  // 본 매핑 상태 디버깅 (변경 시에만 로그)
+  const prevBoneMappingsLengthRef = useRef(0)
+  useEffect(() => {
+    if (boneMappings.length !== prevBoneMappingsLengthRef.current) {
+      prevBoneMappingsLengthRef.current = boneMappings.length
+      console.log('[ExternalModel] 본 매핑 업데이트됨:', boneMappings.length, '개')
+      if (boneMappings.length > 0) {
+        console.log('[ExternalModel] 매핑된 관절:', boneMappings.map(m => `${m.jointKey}→${m.boneName}`).join(', '))
+      }
+    }
+  }, [boneMappings])
+
   // 관절 각도를 본에 적용
+  const lastAppliedAngleRef = useRef<Record<string, number>>({})
   useFrame(() => {
     if (groupRef.current) {
       groupRef.current.position.set(position.x, position.y, position.z)
@@ -417,6 +430,14 @@ export default function ExternalModel({
       const initialRot = initialRotations.get(boneName)
 
       if (angle !== undefined && config && initialRot && bone) {
+        // 각도 변경 시 로그 (프레임마다 출력하지 않도록)
+        if (lastAppliedAngleRef.current[jointKey] !== angle && angle !== 0) {
+          console.log(`[ExternalModel] 관절 회전: ${jointKey} = ${angle}° → 본: ${boneName}`)
+          lastAppliedAngleRef.current[jointKey] = angle
+        } else if (lastAppliedAngleRef.current[jointKey] !== angle && angle === 0) {
+          lastAppliedAngleRef.current[jointKey] = angle
+        }
+
         const radians = degToRad(angle * config.multiplier)
 
         // 초기 회전값에 관절 각도를 더함

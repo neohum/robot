@@ -915,18 +915,57 @@ export default function Home() {
 
   // 본 매핑 테스트
   const handleTestBoneMapping = async () => {
+    // 모델 URL 확인
+    if (!externalModelUrl) {
+      toast.error('외부 모델이 로드되지 않았습니다')
+      setMappingTestResult('오류: 모델 없음')
+      return
+    }
+
+    // Blob URL 만료 확인
+    if (externalModelUrl.startsWith('blob:')) {
+      toast.error('파일 모델은 세션 종료 후 만료됩니다. 다시 로드해주세요.')
+      setMappingTestResult('오류: Blob URL 만료됨')
+      return
+    }
+
+    // 본 매핑 확인
+    if (currentBoneMappings.length === 0 && Object.keys(customBoneMapping).length === 0) {
+      toast.error('매핑된 본이 없습니다. 먼저 본 매핑을 설정해주세요.')
+      setMappingTestResult('오류: 본 매핑 없음')
+      return
+    }
+
     setIsMappingTesting(true)
     setMappingTestResult('테스트 중...')
 
     try {
-      // 테스트 동작: 각 관절을 순서대로 움직임
-      const testJoints: HumanoidJointKey[] = [
+      // 매핑된 관절만 테스트
+      const mappedJoints = customBoneMapping && Object.keys(customBoneMapping).length > 0
+        ? Object.keys(customBoneMapping) as HumanoidJointKey[]
+        : currentBoneMappings.map(m => m.jointKey)
+
+      // 테스트할 관절 (매핑된 것 중 주요 관절만)
+      const primaryJoints: HumanoidJointKey[] = [
         'neckYaw', 'leftShoulderPitch', 'rightShoulderPitch',
         'leftElbow', 'rightElbow', 'leftHipPitch', 'rightHipPitch'
       ]
+      const testJoints = primaryJoints.filter(joint => mappedJoints.includes(joint))
+
+      if (testJoints.length === 0) {
+        toast.warning('테스트 가능한 관절이 없습니다')
+        setMappingTestResult('테스트할 관절 없음')
+        setIsMappingTesting(false)
+        return
+      }
+
+      console.log('[테스트] 매핑된 관절:', mappedJoints.length, '개, 테스트할 관절:', testJoints.length, '개')
 
       for (const joint of testJoints) {
         if (stopRequestedRef.current) break
+
+        setMappingTestResult(`테스트 중: ${joint}`)
+        console.log('[테스트] 관절 테스트:', joint)
 
         // 관절을 30도로 움직임
         await rotateJoint(joint, 30)
@@ -936,10 +975,11 @@ export default function Home() {
         await wait(0.2)
       }
 
-      setMappingTestResult(`테스트 완료! 매핑된 관절: ${currentBoneMappings.length}개`)
+      setMappingTestResult(`테스트 완료! 테스트된 관절: ${testJoints.length}개 / 총 매핑: ${mappedJoints.length}개`)
       toast.success('본 매핑 테스트 완료!')
     } catch (error) {
       if ((error as Error).message !== 'STOP_REQUESTED') {
+        console.error('[테스트] 오류:', error)
         setMappingTestResult('테스트 실패: ' + (error as Error).message)
         toast.error('테스트 중 오류 발생')
       }

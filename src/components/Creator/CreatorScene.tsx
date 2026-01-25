@@ -435,10 +435,85 @@ interface RobotModelProps {
   skinColor: string
 }
 
+// 22개 본으로 구성된 스켈레톤 생성
+function createSkeleton(scale: number, skeletonType: SkeletonType): { skeleton: THREE.Skeleton; rootBone: THREE.Bone; bones: Record<JointName, THREE.Bone> } {
+  const jointPositions = getJointPositions(scale, skeletonType)
+  const bones: Record<string, THREE.Bone> = {}
+
+  // 모든 본 생성
+  for (const jointName of ALL_JOINTS) {
+    const bone = new THREE.Bone()
+    bone.name = jointName
+    const pos = jointPositions[jointName]
+    bone.position.set(pos[0], pos[1], pos[2])
+    bones[jointName] = bone
+  }
+
+  // 본 계층 구조 설정 (부모-자식 관계)
+  // 부모 본의 로컬 좌표계에서 자식 본의 위치를 계산해야 함
+  for (const jointName of ALL_JOINTS) {
+    const parentName = JOINT_HIERARCHY[jointName]
+    if (parentName && bones[parentName]) {
+      const parentBone = bones[parentName]
+      const childBone = bones[jointName]
+
+      // 부모 본에 자식 본 추가
+      parentBone.add(childBone)
+
+      // 자식 본의 위치를 부모 기준 상대 좌표로 변환
+      const parentPos = jointPositions[parentName]
+      const childPos = jointPositions[jointName]
+      childBone.position.set(
+        childPos[0] - parentPos[0],
+        childPos[1] - parentPos[1],
+        childPos[2] - parentPos[2]
+      )
+    }
+  }
+
+  // 루트 본(Hips)은 월드 좌표 그대로
+  const rootBone = bones['Hips']
+  const hipsPos = jointPositions['Hips']
+  rootBone.position.set(hipsPos[0], hipsPos[1], hipsPos[2])
+
+  // 스켈레톤 생성
+  const boneArray = ALL_JOINTS.map(name => bones[name])
+  const skeleton = new THREE.Skeleton(boneArray)
+
+  return { skeleton, rootBone, bones: bones as Record<JointName, THREE.Bone> }
+}
+
 function RobotModel({ skeletonType, skinColor }: RobotModelProps) {
   const groupRef = useRef<THREE.Group>(null)
+  const skeletonRef = useRef<{ skeleton: THREE.Skeleton; rootBone: THREE.Bone; bones: Record<JointName, THREE.Bone> } | null>(null)
   const scale = SKELETON_SCALES[skeletonType]
-  const isHuman = skeletonType.startsWith('human')
+
+  // 스켈레톤 생성 및 그룹에 추가
+  useEffect(() => {
+    if (!groupRef.current) return
+
+    // 기존 스켈레톤 제거
+    if (skeletonRef.current) {
+      groupRef.current.remove(skeletonRef.current.rootBone)
+    }
+
+    // 새 스켈레톤 생성
+    const { skeleton, rootBone, bones } = createSkeleton(scale, skeletonType)
+    skeletonRef.current = { skeleton, rootBone, bones }
+
+    // 루트 본을 그룹에 추가
+    groupRef.current.add(rootBone)
+
+    // 스켈레톤 헬퍼 (디버그용, 필요시 활성화)
+    // const helper = new THREE.SkeletonHelper(rootBone)
+    // groupRef.current.add(helper)
+
+    return () => {
+      if (groupRef.current && skeletonRef.current) {
+        groupRef.current.remove(skeletonRef.current.rootBone)
+      }
+    }
+  }, [scale, skeletonType])
 
   // 자동 회전
   useFrame((state) => {
@@ -496,7 +571,7 @@ function RobotModel({ skeletonType, skinColor }: RobotModelProps) {
         />
       ))}
 
-      {/* 22개 관절 표시 */}
+      {/* 22개 관절 시각화 (본 구조와 별개로 표시) */}
       <SkeletonJoints scale={scale} skeletonType={skeletonType} />
 
       {/* 4발 동물 특수 부위 */}
