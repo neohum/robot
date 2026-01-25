@@ -39,6 +39,181 @@ const SKELETON_SCALES: Record<SkeletonType, number> = {
 
 type BodyPart = 'head' | 'torso' | 'leftArm' | 'rightArm' | 'leftHand' | 'rightHand' | 'leftLeg' | 'rightLeg' | 'leftFoot' | 'rightFoot'
 
+// 22개 기본 관절 정의
+export type JointName =
+  | 'Hips'           // 1. 엉덩이 (루트)
+  | 'Spine'          // 2. 척추
+  | 'Spine1'         // 3. 척추1
+  | 'Spine2'         // 4. 척추2 (가슴)
+  | 'Neck'           // 5. 목
+  | 'Head'           // 6. 머리
+  | 'LeftShoulder'   // 7. 왼쪽 어깨
+  | 'LeftArm'        // 8. 왼쪽 팔
+  | 'LeftForeArm'    // 9. 왼쪽 전완
+  | 'LeftHand'       // 10. 왼손
+  | 'RightShoulder'  // 11. 오른쪽 어깨
+  | 'RightArm'       // 12. 오른쪽 팔
+  | 'RightForeArm'   // 13. 오른쪽 전완
+  | 'RightHand'      // 14. 오른손
+  | 'LeftUpLeg'      // 15. 왼쪽 대퇴부
+  | 'LeftLeg'        // 16. 왼쪽 정강이
+  | 'LeftFoot'       // 17. 왼발
+  | 'LeftToeBase'    // 18. 왼발 앞
+  | 'RightUpLeg'     // 19. 오른쪽 대퇴부
+  | 'RightLeg'       // 20. 오른쪽 정강이
+  | 'RightFoot'      // 21. 오른발
+  | 'RightToeBase'   // 22. 오른발 앞
+
+// 관절 계층 구조
+export const JOINT_HIERARCHY: Record<JointName, JointName | null> = {
+  Hips: null,
+  Spine: 'Hips',
+  Spine1: 'Spine',
+  Spine2: 'Spine1',
+  Neck: 'Spine2',
+  Head: 'Neck',
+  LeftShoulder: 'Spine2',
+  LeftArm: 'LeftShoulder',
+  LeftForeArm: 'LeftArm',
+  LeftHand: 'LeftForeArm',
+  RightShoulder: 'Spine2',
+  RightArm: 'RightShoulder',
+  RightForeArm: 'RightArm',
+  RightHand: 'RightForeArm',
+  LeftUpLeg: 'Hips',
+  LeftLeg: 'LeftUpLeg',
+  LeftFoot: 'LeftLeg',
+  LeftToeBase: 'LeftFoot',
+  RightUpLeg: 'Hips',
+  RightLeg: 'RightUpLeg',
+  RightFoot: 'RightLeg',
+  RightToeBase: 'RightFoot',
+}
+
+// 22개 관절의 기본 위치 (인간형 기준, 스케일 1.0)
+export const getJointPositions = (scale: number, skeletonType: SkeletonType): Record<JointName, [number, number, number]> => {
+  const isHuman = skeletonType.startsWith('human')
+  const s = scale
+
+  if (isHuman) {
+    return {
+      Hips: [0, 0.85 * s, 0],
+      Spine: [0, 0.95 * s, 0],
+      Spine1: [0, 1.05 * s, 0],
+      Spine2: [0, 1.2 * s, 0],
+      Neck: [0, 1.45 * s, 0],
+      Head: [0, 1.6 * s, 0],
+      LeftShoulder: [-0.12 * s, 1.35 * s, 0],
+      LeftArm: [-0.25 * s, 1.3 * s, 0],
+      LeftForeArm: [-0.35 * s, 1.05 * s, 0],
+      LeftHand: [-0.4 * s, 0.82 * s, 0],
+      RightShoulder: [0.12 * s, 1.35 * s, 0],
+      RightArm: [0.25 * s, 1.3 * s, 0],
+      RightForeArm: [0.35 * s, 1.05 * s, 0],
+      RightHand: [0.4 * s, 0.82 * s, 0],
+      LeftUpLeg: [-0.12 * s, 0.8 * s, 0],
+      LeftLeg: [-0.12 * s, 0.45 * s, 0],
+      LeftFoot: [-0.12 * s, 0.08 * s, 0],
+      LeftToeBase: [-0.12 * s, 0.02 * s, 0.1 * s],
+      RightUpLeg: [0.12 * s, 0.8 * s, 0],
+      RightLeg: [0.12 * s, 0.45 * s, 0],
+      RightFoot: [0.12 * s, 0.08 * s, 0],
+      RightToeBase: [0.12 * s, 0.02 * s, 0.1 * s],
+    }
+  }
+
+  // 4발 동물
+  if (skeletonType === 'quadruped') {
+    return {
+      Hips: [-0.2 * s, 0.45 * s, 0],
+      Spine: [0, 0.48 * s, 0],
+      Spine1: [0.15 * s, 0.5 * s, 0],
+      Spine2: [0.28 * s, 0.52 * s, 0],
+      Neck: [0.38 * s, 0.55 * s, 0],
+      Head: [0.48 * s, 0.58 * s, 0],
+      LeftShoulder: [0.22 * s, 0.48 * s, 0.08 * s],
+      LeftArm: [0.2 * s, 0.35 * s, 0.1 * s],
+      LeftForeArm: [0.19 * s, 0.2 * s, 0.1 * s],
+      LeftHand: [0.18 * s, 0.05 * s, 0.1 * s],
+      RightShoulder: [0.22 * s, 0.48 * s, -0.08 * s],
+      RightArm: [0.2 * s, 0.35 * s, -0.1 * s],
+      RightForeArm: [0.19 * s, 0.2 * s, -0.1 * s],
+      RightHand: [0.18 * s, 0.05 * s, -0.1 * s],
+      LeftUpLeg: [-0.2 * s, 0.4 * s, 0.1 * s],
+      LeftLeg: [-0.2 * s, 0.25 * s, 0.1 * s],
+      LeftFoot: [-0.2 * s, 0.08 * s, 0.1 * s],
+      LeftToeBase: [-0.2 * s, 0.02 * s, 0.12 * s],
+      RightUpLeg: [-0.2 * s, 0.4 * s, -0.1 * s],
+      RightLeg: [-0.2 * s, 0.25 * s, -0.1 * s],
+      RightFoot: [-0.2 * s, 0.08 * s, -0.1 * s],
+      RightToeBase: [-0.2 * s, 0.02 * s, -0.12 * s],
+    }
+  }
+
+  // 2발 동물 (biped)
+  if (skeletonType === 'biped') {
+    return {
+      Hips: [0, 0.55 * s, 0],
+      Spine: [0, 0.65 * s, 0],
+      Spine1: [0.02 * s, 0.75 * s, 0],
+      Spine2: [0.05 * s, 0.85 * s, 0],
+      Neck: [0.08 * s, 0.98 * s, 0],
+      Head: [0.12 * s, 1.1 * s, 0],
+      LeftShoulder: [0.05 * s, 0.82 * s, 0.1 * s],
+      LeftArm: [0.08 * s, 0.75 * s, 0.12 * s],
+      LeftForeArm: [0.1 * s, 0.68 * s, 0.13 * s],
+      LeftHand: [0.12 * s, 0.62 * s, 0.14 * s],
+      RightShoulder: [0.05 * s, 0.82 * s, -0.1 * s],
+      RightArm: [0.08 * s, 0.75 * s, -0.12 * s],
+      RightForeArm: [0.1 * s, 0.68 * s, -0.13 * s],
+      RightHand: [0.12 * s, 0.62 * s, -0.14 * s],
+      LeftUpLeg: [-0.02 * s, 0.5 * s, 0.1 * s],
+      LeftLeg: [-0.02 * s, 0.28 * s, 0.1 * s],
+      LeftFoot: [0.02 * s, 0.05 * s, 0.1 * s],
+      LeftToeBase: [0.1 * s, 0.02 * s, 0.1 * s],
+      RightUpLeg: [-0.02 * s, 0.5 * s, -0.1 * s],
+      RightLeg: [-0.02 * s, 0.28 * s, -0.1 * s],
+      RightFoot: [0.02 * s, 0.05 * s, -0.1 * s],
+      RightToeBase: [0.1 * s, 0.02 * s, -0.1 * s],
+    }
+  }
+
+  // 새 (bird)
+  return {
+    Hips: [0, 0.32 * s, 0],
+    Spine: [0, 0.35 * s, 0],
+    Spine1: [0.02 * s, 0.38 * s, 0],
+    Spine2: [0.04 * s, 0.42 * s, 0],
+    Neck: [0.08 * s, 0.48 * s, 0],
+    Head: [0.12 * s, 0.55 * s, 0],
+    LeftShoulder: [0, 0.4 * s, 0.05 * s],
+    LeftArm: [0, 0.4 * s, 0.15 * s],
+    LeftForeArm: [0, 0.4 * s, 0.28 * s],
+    LeftHand: [0, 0.4 * s, 0.38 * s],
+    RightShoulder: [0, 0.4 * s, -0.05 * s],
+    RightArm: [0, 0.4 * s, -0.15 * s],
+    RightForeArm: [0, 0.4 * s, -0.28 * s],
+    RightHand: [0, 0.4 * s, -0.38 * s],
+    LeftUpLeg: [0, 0.28 * s, 0.04 * s],
+    LeftLeg: [0.02 * s, 0.15 * s, 0.04 * s],
+    LeftFoot: [0.04 * s, 0.03 * s, 0.04 * s],
+    LeftToeBase: [0.08 * s, 0.01 * s, 0.04 * s],
+    RightUpLeg: [0, 0.28 * s, -0.04 * s],
+    RightLeg: [0.02 * s, 0.15 * s, -0.04 * s],
+    RightFoot: [0.04 * s, 0.03 * s, -0.04 * s],
+    RightToeBase: [0.08 * s, 0.01 * s, -0.04 * s],
+  }
+}
+
+// 22개 관절 목록
+export const ALL_JOINTS: JointName[] = [
+  'Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head',
+  'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand',
+  'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand',
+  'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'LeftToeBase',
+  'RightUpLeg', 'RightLeg', 'RightFoot', 'RightToeBase'
+]
+
 // 의상 스타일에 따른 지오메트리 스타일 매핑
 const getGeometryStyleFromOutfit = (outfitType: string): 'box' | 'rounded' | 'angular' | 'smooth' | 'mechanical' | 'organic' => {
   const styleMap: Record<string, 'box' | 'rounded' | 'angular' | 'smooth' | 'mechanical' | 'organic'> = {
@@ -243,6 +418,76 @@ function BodyPartMesh({ part, skinColor, outfitColor, outfitType, skeletonScale,
   )
 }
 
+// 관절 간 뼈 연결선 컴포넌트
+function Bone({ start, end, color = '#666666', thickness = 0.01 }: {
+  start: [number, number, number]
+  end: [number, number, number]
+  color?: string
+  thickness?: number
+}) {
+  const startVec = new THREE.Vector3(...start)
+  const endVec = new THREE.Vector3(...end)
+  const direction = new THREE.Vector3().subVectors(endVec, startVec)
+  const length = direction.length()
+
+  if (length < 0.001) return null
+
+  const midpoint = new THREE.Vector3().addVectors(startVec, endVec).multiplyScalar(0.5)
+  const quaternion = new THREE.Quaternion()
+  quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize())
+
+  return (
+    <mesh position={[midpoint.x, midpoint.y, midpoint.z]} quaternion={quaternion}>
+      <cylinderGeometry args={[thickness, thickness, length, 6]} />
+      <meshStandardMaterial color={color} metalness={0.3} roughness={0.7} />
+    </mesh>
+  )
+}
+
+// 22개 관절을 시각화하는 컴포넌트
+function SkeletonJoints({ scale, skeletonType }: { scale: number; skeletonType: SkeletonType }) {
+  const jointPositions = getJointPositions(scale, skeletonType)
+  const jointRadius = 0.02 * scale
+  const boneThickness = 0.008 * scale
+
+  // 관절 색상 (부위별로 다르게)
+  const getJointColor = (joint: JointName): string => {
+    if (joint === 'Hips') return '#FF6B6B'  // 루트: 빨강
+    if (joint.includes('Spine') || joint === 'Neck') return '#4ECDC4'  // 척추: 청록
+    if (joint === 'Head') return '#FFE66D'  // 머리: 노랑
+    if (joint.includes('Left')) return '#95E1D3'  // 왼쪽: 연두
+    if (joint.includes('Right')) return '#F38181'  // 오른쪽: 연빨강
+    return '#888888'
+  }
+
+  return (
+    <group name="skeleton-joints">
+      {/* 모든 관절 구체 */}
+      {ALL_JOINTS.map((joint) => (
+        <mesh key={joint} position={jointPositions[joint]} name={`joint-${joint}`}>
+          <sphereGeometry args={[jointRadius, 8, 8]} />
+          <meshStandardMaterial color={getJointColor(joint)} metalness={0.2} roughness={0.6} />
+        </mesh>
+      ))}
+
+      {/* 관절 간 뼈 연결 */}
+      {ALL_JOINTS.map((joint) => {
+        const parent = JOINT_HIERARCHY[joint]
+        if (!parent) return null
+        return (
+          <Bone
+            key={`bone-${joint}`}
+            start={jointPositions[parent]}
+            end={jointPositions[joint]}
+            color="#555555"
+            thickness={boneThickness}
+          />
+        )
+      })}
+    </group>
+  )
+}
+
 interface RobotModelProps {
   skeletonType: SkeletonType
   skinColor: string
@@ -415,21 +660,8 @@ function RobotModel({ skeletonType, skinColor, outfitStyle, accessories }: Robot
         />
       ))}
 
-      {/* 관절 연결 표시 */}
-      {isHuman && (
-        [
-          [0, 1.4 * scale, 0],
-          [-0.2 * scale, 1.35 * scale, 0],
-          [0.2 * scale, 1.35 * scale, 0],
-          [-0.15 * scale, 0.65 * scale, 0],
-          [0.15 * scale, 0.65 * scale, 0],
-        ].map((pos, i) => (
-          <mesh key={`joint-${i}`} position={pos as [number, number, number]}>
-            <sphereGeometry args={[0.03 * scale, 8, 8]} />
-            <meshStandardMaterial color="#888888" />
-          </mesh>
-        ))
-      )}
+      {/* 22개 관절 표시 */}
+      <SkeletonJoints scale={scale} skeletonType={skeletonType} />
 
       {/* 4발 동물 특수 부위 */}
       {skeletonType === 'quadruped' && (

@@ -66,6 +66,7 @@ export default function Home() {
   const [customBoneMapping, setCustomBoneMapping] = useState<Record<HumanoidJointKey, string>>({} as Record<HumanoidJointKey, string>)
   const [mappingTestResult, setMappingTestResult] = useState<string>('')
   const [isMappingTesting, setIsMappingTesting] = useState(false)
+  const [showPythonHelp, setShowPythonHelp] = useState(false)
 
   const animationController = useRef(new AnimationController())
   const executionSpeedRef = useRef(executionSpeed)
@@ -903,6 +904,14 @@ export default function Home() {
                 >
                   Python
                 </button>
+                {editorMode === 'python' && (
+                  <button
+                    onClick={() => setShowPythonHelp(true)}
+                    className="ml-2 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                  >
+                    명령어 보기
+                  </button>
+                )}
               </div>
             )}
             <button
@@ -936,17 +945,110 @@ export default function Home() {
             </div>
             {/* Python 에디터 */}
             <div
-              className={`absolute inset-0 transition-opacity duration-300 ${
+              className={`absolute inset-0 flex transition-opacity duration-300 ${
                 isWorkspaceMinimized || editorMode !== 'python' ? 'opacity-0 pointer-events-none' : 'opacity-100'
               }`}
             >
-              <PythonEditor
-                initialCode=""
-                generatedCode={pythonCode}
-                onRunCode={executePythonCode}
-                isRunning={isRunning}
-                onCodeChange={(code) => setPythonCode(code)}
-              />
+              <div className={`transition-all duration-300 ${showPythonHelp ? 'w-1/2' : 'w-full'}`}>
+                <PythonEditor
+                  initialCode=""
+                  generatedCode={pythonCode}
+                  onRunCode={executePythonCode}
+                  isRunning={isRunning}
+                  onCodeChange={(code) => setPythonCode(code)}
+                />
+              </div>
+              {/* Python 명령어 사이드 패널 */}
+              {showPythonHelp && (
+                <div className="w-1/2 bg-gray-800 border-l border-gray-700 overflow-y-auto">
+                  <div className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-lg font-bold text-white">Python 명령어</h3>
+                      <button
+                        onClick={() => setShowPythonHelp(false)}
+                        className="text-gray-400 hover:text-white text-lg"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="space-y-3 text-xs">
+                      {/* 관절 제어 */}
+                      <div>
+                        <h4 className="text-cyan-400 font-semibold mb-1">관절 제어</h4>
+                        <div className="bg-gray-900 rounded p-2 font-mono text-green-400">
+                          <div>await rotate_joint(<span className="text-yellow-400">'관절명'</span>, <span className="text-purple-400">각도</span>)</div>
+                          <div className="text-gray-500 text-[10px] mt-1">torso, neckYaw, neckPitch, leftShoulderPitch, leftElbow, rightElbow...</div>
+                        </div>
+                      </div>
+
+                      {/* 그리퍼 */}
+                      <div>
+                        <h4 className="text-cyan-400 font-semibold mb-1">그리퍼</h4>
+                        <div className="bg-gray-900 rounded p-2 font-mono text-green-400">
+                          <div>await set_gripper(<span className="text-yellow-400">'left'</span>|<span className="text-yellow-400">'right'</span>, <span className="text-purple-400">0~1</span>)</div>
+                        </div>
+                      </div>
+
+                      {/* 머리 */}
+                      <div>
+                        <h4 className="text-cyan-400 font-semibold mb-1">머리</h4>
+                        <div className="bg-gray-900 rounded p-2 font-mono text-green-400">
+                          <div>await set_head_pose(<span className="text-purple-400">yaw</span>, <span className="text-purple-400">pitch</span>)</div>
+                        </div>
+                      </div>
+
+                      {/* 팔/다리 */}
+                      <div>
+                        <h4 className="text-cyan-400 font-semibold mb-1">팔/다리 자세</h4>
+                        <div className="bg-gray-900 rounded p-2 font-mono text-green-400 space-y-1">
+                          <div>await set_arm_pose(<span className="text-yellow-400">'left'</span>, <span className="text-purple-400">어깨P, 어깨Y, 팔꿈치, 손목</span>)</div>
+                          <div>await set_leg_pose(<span className="text-yellow-400">'left'</span>, <span className="text-purple-400">힙P, 힙Y, 무릎, 발목</span>)</div>
+                        </div>
+                      </div>
+
+                      {/* 프리셋 */}
+                      <div>
+                        <h4 className="text-cyan-400 font-semibold mb-1">프리셋 자세</h4>
+                        <div className="bg-gray-900 rounded p-2 font-mono text-green-400 space-y-1">
+                          <div>await set_preset_pose(<span className="text-yellow-400">'tpose'</span>|<span className="text-yellow-400">'wave'</span>|<span className="text-yellow-400">'bow'</span>|<span className="text-yellow-400">'fighting'</span>)</div>
+                        </div>
+                      </div>
+
+                      {/* 이동 */}
+                      <div>
+                        <h4 className="text-cyan-400 font-semibold mb-1">이동</h4>
+                        <div className="bg-gray-900 rounded p-2 font-mono text-green-400 space-y-1">
+                          <div>await move_forward/backward/left/right(<span className="text-purple-400">거리</span>)</div>
+                          <div>await jump(<span className="text-purple-400">높이</span>)</div>
+                        </div>
+                      </div>
+
+                      {/* 기타 */}
+                      <div>
+                        <h4 className="text-cyan-400 font-semibold mb-1">기타</h4>
+                        <div className="bg-gray-900 rounded p-2 font-mono text-green-400 space-y-1">
+                          <div>await wait(<span className="text-purple-400">초</span>)</div>
+                          <div>await reset_robot()</div>
+                          <div>await reset_position()</div>
+                        </div>
+                      </div>
+
+                      {/* 예제 */}
+                      <div>
+                        <h4 className="text-cyan-400 font-semibold mb-1">예제</h4>
+                        <div className="bg-gray-900 rounded p-2 font-mono text-green-400 text-[10px] space-y-0.5">
+                          <div className="text-gray-500"># 손 흔들기</div>
+                          <div>await set_arm_pose('right', -90, 0, 0, 0)</div>
+                          <div>await wait(0.5)</div>
+                          <div>await rotate_joint('rightWrist', 30)</div>
+                          <div>await reset_robot()</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             {/* 최소화 시 세로 텍스트 */}
             {isWorkspaceMinimized && (
