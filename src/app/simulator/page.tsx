@@ -114,16 +114,28 @@ export default function Home() {
     setSavedExternalModels(getAllExternalModels())
 
     // Wasabi에서 모델 목록 불러오기 (백그라운드)
-    getModelsFromWasabi().then(wasabiModels => {
-      if (wasabiModels.length > 0) {
-        console.log('[Simulator] Wasabi에서 모델 목록 로드됨:', wasabiModels.length, '개')
-        // Wasabi 모델을 로컬 스토리지와 병합 (중복 제거)
-        const localModels = getAllExternalModels()
-        wasabiModels.forEach(wm => {
-          // ID로 URL 가져와서 로컬에 저장 (필요시)
-          localStorage.setItem(`wasabi-model-id-${wm.name}`, wm.id)
-        })
+    getModelsFromWasabi().then(async (wasabiModels) => {
+      if (wasabiModels.length === 0) return
+      console.log('[Simulator] Wasabi에서 모델 목록 로드됨:', wasabiModels.length, '개')
+
+      const localModels = getAllExternalModels()
+      const localNames = new Set(localModels.map(m => m.name))
+
+      for (const wm of wasabiModels) {
+        localStorage.setItem(`wasabi-model-id-${wm.name}`, wm.id)
+
+        // 로컬에 없는 Wasabi 모델은 URL을 발급받아 로컬에 저장
+        if (!localNames.has(wm.name)) {
+          const result = await getModelUrlFromWasabi(wm.id)
+          if (result.success && result.url) {
+            saveExternalModel(wm.name, result.url, 'url')
+            console.log(`[Simulator] Wasabi 모델 동기화: ${wm.name}`)
+          }
+        }
       }
+
+      // 병합된 목록으로 UI 갱신
+      setSavedExternalModels(getAllExternalModels())
     })
 
     // 마지막으로 사용한 외부 모델 불러오기 (blob URL은 만료되므로 건너뛰기)
