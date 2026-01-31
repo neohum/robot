@@ -2,19 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
-const wasabiClient = new S3Client({
-  endpoint: process.env.WASABI_ENDPOINT || 'https://s3.ap-northeast-1.wasabisys.com',
-  region: process.env.WASABI_REGION || 'ap-northeast-1',
-  credentials: {
-    accessKeyId: process.env.WASABI_ACCESS_KEY || '',
-    secretAccessKey: process.env.WASABI_SECRET_KEY || '',
-  },
-})
+const isWasabiConfigured = !!(process.env.WASABI_ACCESS_KEY && process.env.WASABI_SECRET_KEY)
 
 const BUCKET_NAME = process.env.WASABI_BUCKET || 'robot2026'
 const MODELS_PREFIX = 'external-models/'
 
-const isWasabiConfigured = !!(process.env.WASABI_ACCESS_KEY && process.env.WASABI_SECRET_KEY)
+let wasabiClient: S3Client | null = null
+function getWasabiClient(): S3Client {
+  if (!wasabiClient) {
+    wasabiClient = new S3Client({
+      endpoint: process.env.WASABI_ENDPOINT || 'https://s3.ap-northeast-1.wasabisys.com',
+      region: process.env.WASABI_REGION || 'ap-northeast-1',
+      credentials: {
+        accessKeyId: process.env.WASABI_ACCESS_KEY || '',
+        secretAccessKey: process.env.WASABI_SECRET_KEY || '',
+      },
+    })
+  }
+  return wasabiClient
+}
 
 export interface ExternalModelMetadata {
   id: string
@@ -46,7 +52,7 @@ export async function POST(request: NextRequest) {
     const key = `${MODELS_PREFIX}${id}`
 
     // GLB 파일 업로드
-    await wasabiClient.send(new PutObjectCommand({
+    await getWasabiClient().send(new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
       Body: buffer,
@@ -67,7 +73,7 @@ export async function POST(request: NextRequest) {
       scale: scaleStr ? parseFloat(scaleStr) : undefined,
     }
 
-    await wasabiClient.send(new PutObjectCommand({
+    await getWasabiClient().send(new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: `${key}.meta.json`,
       Body: JSON.stringify(metadata),
@@ -76,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     // Presigned URL 생성 (1시간 유효)
     const url = await getSignedUrl(
-      wasabiClient,
+      getWasabiClient(),
       new GetObjectCommand({
         Bucket: BUCKET_NAME,
         Key: key,
@@ -114,7 +120,7 @@ export async function GET(request: NextRequest) {
       
       // Presigned URL 생성 (1시간 유효)
       const url = await getSignedUrl(
-        wasabiClient,
+        getWasabiClient(),
         new GetObjectCommand({
           Bucket: BUCKET_NAME,
           Key: key,
@@ -124,7 +130,7 @@ export async function GET(request: NextRequest) {
 
       // 메타데이터 가져오기
       try {
-        const metaResponse = await wasabiClient.send(new GetObjectCommand({
+        const metaResponse = await getWasabiClient().send(new GetObjectCommand({
           Bucket: BUCKET_NAME,
           Key: `${key}.meta.json`,
         }))
@@ -148,7 +154,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 모든 모델 목록 조회
-    const response = await wasabiClient.send(new ListObjectsV2Command({
+    const response = await getWasabiClient().send(new ListObjectsV2Command({
       Bucket: BUCKET_NAME,
       Prefix: MODELS_PREFIX,
     }))
@@ -159,7 +165,7 @@ export async function GET(request: NextRequest) {
       for (const item of response.Contents) {
         if (item.Key && item.Key.endsWith('.meta.json')) {
           try {
-            const getResponse = await wasabiClient.send(new GetObjectCommand({
+            const getResponse = await getWasabiClient().send(new GetObjectCommand({
               Bucket: BUCKET_NAME,
               Key: item.Key,
             }))
@@ -205,14 +211,14 @@ export async function DELETE(request: NextRequest) {
     const key = `${MODELS_PREFIX}${id}`
 
     // GLB 파일 삭제
-    await wasabiClient.send(new DeleteObjectCommand({
+    await getWasabiClient().send(new DeleteObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
     }))
 
     // 메타데이터 삭제
     try {
-      await wasabiClient.send(new DeleteObjectCommand({
+      await getWasabiClient().send(new DeleteObjectCommand({
         Bucket: BUCKET_NAME,
         Key: `${key}.meta.json`,
       }))
@@ -248,7 +254,7 @@ export async function PUT(request: NextRequest) {
     // 기존 메타데이터 가져오기
     let metadata: ExternalModelMetadata
     try {
-      const metaResponse = await wasabiClient.send(new GetObjectCommand({
+      const metaResponse = await getWasabiClient().send(new GetObjectCommand({
         Bucket: BUCKET_NAME,
         Key: metaKey,
       }))
@@ -272,7 +278,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // 업데이트된 메타데이터 저장
-    await wasabiClient.send(new PutObjectCommand({
+    await getWasabiClient().send(new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: metaKey,
       Body: JSON.stringify(metadata),
