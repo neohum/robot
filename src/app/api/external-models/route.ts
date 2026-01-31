@@ -188,10 +188,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, models })
   } catch (error: any) {
     console.error('Get models error:', error)
-    return NextResponse.json(
-      { error: 'Failed to get models', message: error.message },
-      { status: 500 }
-    )
+    // S3 연결 실패 시에도 빈 목록 반환 (앱 동작에 영향 없도록)
+    return NextResponse.json({ success: true, models: [] })
   }
 }
 
