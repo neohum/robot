@@ -67,6 +67,7 @@ export default function Home() {
   const [mappingTestResult, setMappingTestResult] = useState<string>('')
   const [isMappingTesting, setIsMappingTesting] = useState(false)
   const [showPythonHelp, setShowPythonHelp] = useState(false)
+  const [backgroundModelUrl, setBackgroundModelUrl] = useState<string>('')
 
   const animationController = useRef(new AnimationController())
   const executionSpeedRef = useRef(executionSpeed)
@@ -923,6 +924,29 @@ export default function Home() {
     }
   }
 
+  // 배경 GLB 파일 로드
+  const handleBackgroundModelLoad = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // 이전 Blob URL 정리
+      if (backgroundModelUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(backgroundModelUrl)
+      }
+      const blobUrl = URL.createObjectURL(file)
+      setBackgroundModelUrl(blobUrl)
+      toast.success(`배경 모델 "${file.name}" 을 불러왔습니다`)
+    }
+  }
+
+  // 배경 모델 제거
+  const handleRemoveBackground = () => {
+    if (backgroundModelUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(backgroundModelUrl)
+    }
+    setBackgroundModelUrl('')
+    toast.success('배경 모델이 제거되었습니다')
+  }
+
   // 저장된 외부 모델 불러오기
   const handleLoadSavedExternalModel = (model: SavedExternalModel) => {
     boneMappingLoadedRef.current = false // 새 모델이므로 리셋
@@ -1344,6 +1368,7 @@ export default function Home() {
               externalModelUrl={externalModelUrl}
               onBonesFound={handleBonesFound}
               customBoneMapping={Object.keys(customBoneMapping).length > 0 ? customBoneMapping : undefined}
+              backgroundModelUrl={backgroundModelUrl || undefined}
             />
 
             <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-sm px-4 py-2 rounded-lg">
@@ -1390,6 +1415,26 @@ export default function Home() {
                 >
                   외부 모델
                 </button>
+              </div>
+              {/* 배경 모델 컨트롤 */}
+              <div className="flex flex-wrap items-center gap-1 mt-2">
+                <label className="px-2 py-1 text-xs rounded bg-gray-700 text-gray-300 hover:bg-gray-600 cursor-pointer">
+                  배경
+                  <input
+                    type="file"
+                    accept=".glb,.gltf"
+                    onChange={handleBackgroundModelLoad}
+                    className="hidden"
+                  />
+                </label>
+                {backgroundModelUrl && (
+                  <button
+                    onClick={handleRemoveBackground}
+                    className="px-2 py-1 text-xs rounded bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    제거
+                  </button>
+                )}
               </div>
               {/* 외부 모델일 때 본 매핑 버튼들 */}
               {modelType === 'external' && externalModelUrl && (

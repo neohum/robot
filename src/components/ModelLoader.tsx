@@ -60,8 +60,3 @@ export default function ModelLoader({ url, position = [0, 0, 0], scale = 1, rota
     />
   )
 }
-
-// useGLTF 프리로드 (선택적)
-useGLTF.preload = (url: string) => {
-  useGLTF.preload(url)
-}
