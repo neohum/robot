@@ -14,6 +14,8 @@ const wasabiClient = new S3Client({
 const BUCKET_NAME = process.env.WASABI_BUCKET || 'robot2026'
 const MODELS_PREFIX = 'external-models/'
 
+const isWasabiConfigured = !!(process.env.WASABI_ACCESS_KEY && process.env.WASABI_SECRET_KEY)
+
 export interface ExternalModelMetadata {
   id: string
   name: string
@@ -25,6 +27,9 @@ export interface ExternalModelMetadata {
 
 // POST: GLB 파일 업로드
 export async function POST(request: NextRequest) {
+  if (!isWasabiConfigured) {
+    return NextResponse.json({ error: 'Wasabi storage not configured' }, { status: 503 })
+  }
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File
@@ -96,6 +101,9 @@ export async function POST(request: NextRequest) {
 
 // GET: 모델 목록 조회 또는 특정 모델의 URL 가져오기
 export async function GET(request: NextRequest) {
+  if (!isWasabiConfigured) {
+    return NextResponse.json({ success: true, models: [] })
+  }
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -183,6 +191,9 @@ export async function GET(request: NextRequest) {
 
 // DELETE: 모델 삭제
 export async function DELETE(request: NextRequest) {
+  if (!isWasabiConfigured) {
+    return NextResponse.json({ error: 'Wasabi storage not configured' }, { status: 503 })
+  }
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -221,6 +232,9 @@ export async function DELETE(request: NextRequest) {
 
 // PUT: 메타데이터 업데이트 (본 매핑, 스케일 등)
 export async function PUT(request: NextRequest) {
+  if (!isWasabiConfigured) {
+    return NextResponse.json({ error: 'Wasabi storage not configured' }, { status: 503 })
+  }
   try {
     const { id, boneMapping, scale } = await request.json()
 
