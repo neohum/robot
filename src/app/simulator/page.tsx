@@ -68,6 +68,7 @@ export default function Home() {
   const [isMappingTesting, setIsMappingTesting] = useState(false)
   const [showPythonHelp, setShowPythonHelp] = useState(false)
   const [backgroundModelUrl, setBackgroundModelUrl] = useState<string>('')
+  const [backgroundModelScale, setBackgroundModelScale] = useState<number>(1)
   const [showBackgroundModelList, setShowBackgroundModelList] = useState(false)
 
   const animationController = useRef(new AnimationController())
@@ -1380,6 +1381,7 @@ export default function Home() {
               onBonesFound={handleBonesFound}
               customBoneMapping={Object.keys(customBoneMapping).length > 0 ? customBoneMapping : undefined}
               backgroundModelUrl={backgroundModelUrl || undefined}
+              backgroundModelScale={backgroundModelScale}
             />
 
             <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-sm px-4 py-2 rounded-lg">
@@ -1456,6 +1458,21 @@ export default function Home() {
                     </button>
                   )}
                 </div>
+                {backgroundModelUrl && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-gray-400 w-14">스케일</span>
+                    <input
+                      type="range"
+                      min="0.01"
+                      max="10"
+                      step="0.01"
+                      value={backgroundModelScale}
+                      onChange={(e) => setBackgroundModelScale(parseFloat(e.target.value))}
+                      className="flex-1 h-1 accent-teal-500"
+                    />
+                    <span className="text-xs text-gray-300 w-10 text-right">{backgroundModelScale.toFixed(2)}</span>
+                  </div>
+                )}
                 {showBackgroundModelList && (
                   <div className="absolute top-full left-0 mt-1 w-56 bg-gray-800/95 backdrop-blur-sm border border-gray-600 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
                     {savedExternalModels.map((model) => (

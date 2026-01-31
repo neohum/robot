@@ -21,9 +21,10 @@ interface RobotSceneProps {
   onBonesFound?: (bones: string[], mappings: BoneMapping[]) => void;
   customBoneMapping?: Record<HumanoidJointKey, string>;
   backgroundModelUrl?: string;
+  backgroundModelScale?: number;
 }
 
-function BackgroundModel({ url }: { url: string }) {
+function BackgroundModel({ url, scale = 1 }: { url: string; scale?: number }) {
   const { scene } = useGLTF(url)
   const cloned = useMemo(() => scene.clone(), [scene])
 
@@ -36,10 +37,10 @@ function BackgroundModel({ url }: { url: string }) {
     })
   }, [cloned])
 
-  return <primitive object={cloned} />
+  return <primitive object={cloned} scale={[scale, scale, scale]} />
 }
 
-function Scene({ jointAngles, modelType = 'gundam', position = { x: 0, y: 0, z: 0 }, brightness = 1.0, externalModelUrl, externalModelScale = 1, onBonesFound, customBoneMapping, backgroundModelUrl }: RobotSceneProps) {
+function Scene({ jointAngles, modelType = 'gundam', position = { x: 0, y: 0, z: 0 }, brightness = 1.0, externalModelUrl, externalModelScale = 1, onBonesFound, customBoneMapping, backgroundModelUrl, backgroundModelScale = 1 }: RobotSceneProps) {
   return (
     <>
       {/* 카메라 설정 */}
@@ -86,7 +87,7 @@ function Scene({ jointAngles, modelType = 'gundam', position = { x: 0, y: 0, z: 
       )}
 
       {/* 배경 모델 */}
-      {backgroundModelUrl && <BackgroundModel url={backgroundModelUrl} />}
+      {backgroundModelUrl && <BackgroundModel url={backgroundModelUrl} scale={backgroundModelScale} />}
 
       {/* 그리드 */}
       <Grid
@@ -109,7 +110,7 @@ function Scene({ jointAngles, modelType = 'gundam', position = { x: 0, y: 0, z: 
   )
 }
 
-export default function RobotScene({ jointAngles, modelType = 'gundam', position = { x: 0, y: 0, z: 0 }, brightness = 1.0, externalModelUrl, externalModelScale = 1, onBonesFound, customBoneMapping, backgroundModelUrl }: RobotSceneProps) {
+export default function RobotScene({ jointAngles, modelType = 'gundam', position = { x: 0, y: 0, z: 0 }, brightness = 1.0, externalModelUrl, externalModelScale = 1, onBonesFound, customBoneMapping, backgroundModelUrl, backgroundModelScale = 1 }: RobotSceneProps) {
   return (
     <div className="w-full h-full">
       <Canvas shadows>
@@ -124,6 +125,7 @@ export default function RobotScene({ jointAngles, modelType = 'gundam', position
             onBonesFound={onBonesFound}
             customBoneMapping={customBoneMapping}
             backgroundModelUrl={backgroundModelUrl}
+            backgroundModelScale={backgroundModelScale}
           />
         </Suspense>
       </Canvas>
