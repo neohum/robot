@@ -29,6 +29,7 @@ export interface ExternalModelMetadata {
   size: number
   boneMapping?: Record<string, string>
   scale?: number
+  modelType?: 'character' | 'background'
 }
 
 // POST: GLB 파일 업로드
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
     const name = formData.get('name') as string
     const boneMappingStr = formData.get('boneMapping') as string
     const scaleStr = formData.get('scale') as string
+    const modelTypeStr = formData.get('modelType') as string
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
@@ -71,6 +73,7 @@ export async function POST(request: NextRequest) {
       size: buffer.length,
       boneMapping: boneMappingStr ? JSON.parse(boneMappingStr) : undefined,
       scale: scaleStr ? parseFloat(scaleStr) : undefined,
+      modelType: modelTypeStr === 'background' ? 'background' : 'character',
     }
 
     await getWasabiClient().send(new PutObjectCommand({

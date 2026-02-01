@@ -18,6 +18,7 @@ const STORAGE_KEY = 'robot-blockly-projects';
 const CURRENT_PROJECT_KEY = 'robot-blockly-current';
 const BONE_MAPPING_KEY = 'robot-bone-mappings';
 const EXTERNAL_MODEL_KEY = 'robot-external-model';
+const BACKGROUND_MODEL_KEY = 'robot-background-model';
 
 export interface SavedExternalModel {
   name: string;
@@ -319,6 +320,48 @@ export const testExternalModelSync = async (): Promise<{
 };
 
 // ============================================
+// 배경 모델 저장 함수들
+// ============================================
+
+// 배경 모델 저장
+export const saveBackgroundModel = (
+  name: string,
+  url: string,
+  source: 'file' | 'url',
+  scale?: number
+): void => {
+  const models = getAllBackgroundModels();
+  const model: SavedExternalModel = {
+    name,
+    url,
+    timestamp: Date.now(),
+    scale,
+    source,
+  };
+
+  const existingIndex = models.findIndex(m => m.name === name);
+  if (existingIndex >= 0) {
+    models[existingIndex] = model;
+  } else {
+    models.push(model);
+  }
+
+  localStorage.setItem(BACKGROUND_MODEL_KEY, JSON.stringify(models));
+};
+
+// 모든 배경 모델 불러오기
+export const getAllBackgroundModels = (): SavedExternalModel[] => {
+  const data = localStorage.getItem(BACKGROUND_MODEL_KEY);
+  return data ? JSON.parse(data) : [];
+};
+
+// 배경 모델 삭제
+export const deleteBackgroundModel = (name: string): void => {
+  const models = getAllBackgroundModels().filter(m => m.name !== name);
+  localStorage.setItem(BACKGROUND_MODEL_KEY, JSON.stringify(models));
+};
+
+// ============================================
 // Wasabi 서버 기반 외부 모델 함수들
 // ============================================
 
@@ -329,13 +372,15 @@ export interface WasabiExternalModel {
   size: number
   boneMapping?: Record<string, string>
   scale?: number
+  modelType?: 'character' | 'background'
 }
 
 // Wasabi에 모델 업로드
 export const uploadModelToWasabi = async (
   file: File,
   boneMapping?: Record<string, string>,
-  scale?: number
+  scale?: number,
+  modelType?: 'character' | 'background'
 ): Promise<{ success: boolean; id?: string; url?: string; error?: string }> => {
   try {
     const formData = new FormData()
@@ -346,6 +391,9 @@ export const uploadModelToWasabi = async (
     }
     if (scale) {
       formData.append('scale', scale.toString())
+    }
+    if (modelType) {
+      formData.append('modelType', modelType)
     }
 
     const response = await fetch('/api/external-models', {

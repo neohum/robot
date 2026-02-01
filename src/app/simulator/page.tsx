@@ -10,7 +10,7 @@ import type { ModelType } from '@/components/Scene/RobotScene'
 import { AnimationController } from '@/lib/animationController'
 import { generateCode } from '@/lib/blockly/codeGenerator'
 import { generatePythonCode } from '@/lib/blockly/pythonGenerator'
-import { saveProject, loadProject, getAllProjects, deleteProject, saveCurrentWorkspace, loadCurrentWorkspace, SavedProject, saveExternalModel, getAllExternalModels, deleteExternalModel, loadCurrentExternalModel, saveCurrentExternalModel, testExternalModelSync, SavedExternalModel, saveBoneMapping, loadBoneMapping, SavedBoneMapping, uploadModelToWasabi, getModelsFromWasabi, getModelUrlFromWasabi, updateModelMetadataInWasabi } from '@/lib/storage'
+import { saveProject, loadProject, getAllProjects, deleteProject, saveCurrentWorkspace, loadCurrentWorkspace, SavedProject, saveExternalModel, getAllExternalModels, deleteExternalModel, loadCurrentExternalModel, saveCurrentExternalModel, testExternalModelSync, SavedExternalModel, saveBoneMapping, loadBoneMapping, SavedBoneMapping, uploadModelToWasabi, getModelsFromWasabi, getModelUrlFromWasabi, updateModelMetadataInWasabi, saveBackgroundModel, getAllBackgroundModels, deleteBackgroundModel } from '@/lib/storage'
 import type { BoneMapping } from '@/components/ExternalModel/ExternalModel'
 import { EXAMPLE_PROGRAMS } from '@/lib/examples'
 import ControlPanel from '@/components/Controls/ControlPanel'
@@ -70,6 +70,7 @@ export default function Home() {
   const [backgroundModelUrl, setBackgroundModelUrl] = useState<string>('')
   const [backgroundModelScale, setBackgroundModelScale] = useState<number>(1)
   const [showBackgroundDialog, setShowBackgroundDialog] = useState(false)
+  const [savedBackgroundModels, setSavedBackgroundModels] = useState<SavedExternalModel[]>([])
 
   const animationController = useRef(new AnimationController())
   const executionSpeedRef = useRef(executionSpeed)
@@ -112,30 +113,44 @@ export default function Home() {
 
     // 저장된 외부 모델 목록 불러오기
     setSavedExternalModels(getAllExternalModels())
+    setSavedBackgroundModels(getAllBackgroundModels())
 
     // Wasabi에서 모델 목록 불러오기 (백그라운드)
     getModelsFromWasabi().then(async (wasabiModels) => {
       if (wasabiModels.length === 0) return
       console.log('[Simulator] Wasabi에서 모델 목록 로드됨:', wasabiModels.length, '개')
 
-      const localModels = getAllExternalModels()
-      const localNames = new Set(localModels.map(m => m.name))
+      const localCharModels = getAllExternalModels()
+      const localCharNames = new Set(localCharModels.map(m => m.name))
+      const localBgModels = getAllBackgroundModels()
+      const localBgNames = new Set(localBgModels.map(m => m.name))
 
       for (const wm of wasabiModels) {
         localStorage.setItem(`wasabi-model-id-${wm.name}`, wm.id)
+        const isBackground = wm.modelType === 'background'
 
-        // 로컬에 없는 Wasabi 모델은 URL을 발급받아 로컬에 저장
-        if (!localNames.has(wm.name)) {
-          const result = await getModelUrlFromWasabi(wm.id)
-          if (result.success && result.url) {
-            saveExternalModel(wm.name, result.url, 'url')
-            console.log(`[Simulator] Wasabi 모델 동기화: ${wm.name}`)
+        if (isBackground) {
+          if (!localBgNames.has(wm.name)) {
+            const result = await getModelUrlFromWasabi(wm.id)
+            if (result.success && result.url) {
+              saveBackgroundModel(wm.name, result.url, 'url')
+              console.log(`[Simulator] Wasabi 배경 모델 동기화: ${wm.name}`)
+            }
+          }
+        } else {
+          if (!localCharNames.has(wm.name)) {
+            const result = await getModelUrlFromWasabi(wm.id)
+            if (result.success && result.url) {
+              saveExternalModel(wm.name, result.url, 'url')
+              console.log(`[Simulator] Wasabi 모델 동기화: ${wm.name}`)
+            }
           }
         }
       }
 
       // 병합된 목록으로 UI 갱신
       setSavedExternalModels(getAllExternalModels())
+      setSavedBackgroundModels(getAllBackgroundModels())
     })
 
     // 마지막으로 사용한 외부 모델 불러오기 (blob URL은 만료되므로 건너뛰기)
@@ -955,14 +970,14 @@ export default function Home() {
 
       // 백그라운드에서 Wasabi에 업로드
       toast.promise(
-        uploadModelToWasabi(file, {}),
+        uploadModelToWasabi(file, {}, undefined, 'background'),
         {
           loading: `배경 "${file.name}" Wasabi 업로드 중...`,
           success: (result) => {
             if (result.success && result.url && result.id) {
               setBackgroundModelUrl(result.url)
-              saveExternalModel(name, result.url, 'url')
-              setSavedExternalModels(getAllExternalModels())
+              saveBackgroundModel(name, result.url, 'url')
+              setSavedBackgroundModels(getAllBackgroundModels())
               URL.revokeObjectURL(blobUrl)
               localStorage.setItem(`wasabi-model-id-${name}`, result.id)
               return `배경 "${file.name}" 업로드 완료!`
@@ -970,8 +985,8 @@ export default function Home() {
             return '업로드 완료'
           },
           error: () => {
-            saveExternalModel(name, blobUrl, 'file')
-            setSavedExternalModels(getAllExternalModels())
+            saveBackgroundModel(name, blobUrl, 'file')
+            setSavedBackgroundModels(getAllBackgroundModels())
             return '업로드 실패. 현재 세션에서만 사용 가능합니다.'
           }
         }
@@ -989,24 +1004,60 @@ export default function Home() {
   }
 
   // 저장된 모델을 배경으로 불러오기
-  const handleLoadBackgroundFromSaved = (model: SavedExternalModel) => {
+  const handleLoadBackgroundFromSaved = async (model: SavedExternalModel) => {
     if (backgroundModelUrl.startsWith('blob:')) {
       URL.revokeObjectURL(backgroundModelUrl)
     }
-    setBackgroundModelUrl(model.url)
     setShowBackgroundDialog(false)
+
+    let url = model.url
+
+    // Wasabi presigned URL이면 갱신 (만료 방지)
+    if (url.includes('wasabisys.com')) {
+      const modelId = localStorage.getItem(`wasabi-model-id-${model.name}`)
+      if (modelId) {
+        const result = await getModelUrlFromWasabi(modelId)
+        if (result.success && result.url) {
+          url = result.url
+          saveBackgroundModel(model.name, url, 'url', model.scale)
+          setSavedBackgroundModels(getAllBackgroundModels())
+        }
+      }
+    }
+
+    setBackgroundModelUrl(url)
     toast.success(`배경: "${model.name}"`)
   }
 
   // 저장된 외부 모델 불러오기
-  const handleLoadSavedExternalModel = (model: SavedExternalModel) => {
+  const handleLoadSavedExternalModel = async (model: SavedExternalModel) => {
     boneMappingLoadedRef.current = false // 새 모델이므로 리셋
     setCustomBoneMapping({} as Record<HumanoidJointKey, string>)
-    setExternalModelUrl(model.url)
+    setShowExternalModelDialog(false)
+
+    let url = model.url
+
+    // Wasabi presigned URL이면 갱신 (만료 방지)
+    if (url.includes('wasabisys.com')) {
+      const modelId = localStorage.getItem(`wasabi-model-id-${model.name}`)
+      if (modelId) {
+        const result = await getModelUrlFromWasabi(modelId)
+        if (result.success && result.url) {
+          url = result.url
+          saveExternalModel(model.name, url, 'url', model.scale)
+          setSavedExternalModels(getAllExternalModels())
+
+          if (result.metadata?.boneMapping) {
+            setCustomBoneMapping(result.metadata.boneMapping as Record<HumanoidJointKey, string>)
+          }
+        }
+      }
+    }
+
+    setExternalModelUrl(url)
     setExternalModelName(model.name)
     setModelType('external')
-    saveCurrentExternalModel(model.url, model.name)
-    setShowExternalModelDialog(false)
+    saveCurrentExternalModel(url, model.name)
     toast.success(`"${model.name}" 모델을 불러왔습니다!`)
   }
 
@@ -1820,12 +1871,12 @@ export default function Home() {
             <h2 className="text-xl font-bold text-white mb-4">배경 모델 불러오기</h2>
 
             <div className="space-y-4">
-              {/* 저장된 모델 목록 */}
-              {savedExternalModels.length > 0 && (
+              {/* 저장된 배경 모델 목록 */}
+              {savedBackgroundModels.length > 0 && (
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">저장된 모델 ({savedExternalModels.length}개)</label>
+                  <label className="block text-sm text-gray-400 mb-2">저장된 배경 ({savedBackgroundModels.length}개)</label>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {savedExternalModels.map((model) => (
+                    {savedBackgroundModels.map((model) => (
                       <div
                         key={model.name}
                         className="flex items-center justify-between bg-gray-700 rounded-lg px-3 py-2"
@@ -1836,12 +1887,24 @@ export default function Home() {
                             {model.source === 'file' ? '파일' : 'URL'} • {new Date(model.timestamp).toLocaleDateString()}
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleLoadBackgroundFromSaved(model)}
-                          className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white text-xs rounded"
-                        >
-                          배경으로 사용
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleLoadBackgroundFromSaved(model)}
+                            className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white text-xs rounded"
+                          >
+                            배경으로 사용
+                          </button>
+                          <button
+                            onClick={() => {
+                              deleteBackgroundModel(model.name)
+                              setSavedBackgroundModels(getAllBackgroundModels())
+                              toast.success('배경 모델이 삭제되었습니다')
+                            }}
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded"
+                          >
+                            삭제
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1850,7 +1913,7 @@ export default function Home() {
 
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-px bg-gray-600" />
-                <span className="text-gray-500 text-sm">로컬 파일</span>
+                <span className="text-gray-500 text-sm">새 배경 추가</span>
                 <div className="flex-1 h-px bg-gray-600" />
               </div>
 
