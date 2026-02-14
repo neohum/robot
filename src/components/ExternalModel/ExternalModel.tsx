@@ -9,7 +9,7 @@ import { HumanoidJointAngles, HumanoidJointKey } from '@/lib/types/robot'
 // 본 이름 매핑 - 다양한 명명 규칙 지원
 // 각 관절의 첫 번째 항목은 정확히 일치하는 이름 (exact match 우선)
 const BONE_NAME_PATTERNS: Record<HumanoidJointKey, string[]> = {
-  torso: ['torso', 'Spine', 'spine', 'Spine1', 'spine1', 'mixamorigSpine', 'Torso', 'Chest', 'chest'],
+  torso: ['torso', 'Spine', 'spine', 'Spine1', 'spine1', 'Spine2', 'spine2', 'mixamorigSpine', 'Torso', 'Chest', 'chest'],
   neckYaw: ['neckYaw', 'Neck', 'neck', 'mixamorigNeck'],
   neckPitch: ['neckPitch', 'Head', 'head', 'mixamorigHead'],
 
@@ -28,12 +28,12 @@ const BONE_NAME_PATTERNS: Record<HumanoidJointKey, string[]> = {
   leftHipPitch: ['leftHipPitch', 'LeftUpLeg', 'mixamorigLeftUpLeg', 'Left_UpLeg', 'L_UpLeg', 'thigh.L', 'LeftUpperLeg'],
   leftHipYaw: ['leftHipYaw', 'LeftHip', 'mixamorigLeftUpLeg', 'Left_Hip', 'L_Hip'],
   leftKnee: ['leftKnee', 'LeftLeg', 'LeftKnee', 'mixamorigLeftLeg', 'Left_Leg', 'L_Leg', 'shin.L', 'LeftLowerLeg'],
-  leftAnkle: ['leftAnkle', 'LeftFoot', 'LeftAnkle', 'mixamorigLeftFoot', 'Left_Foot', 'L_Foot', 'foot.L'],
+  leftAnkle: ['leftAnkle', 'LeftFoot', 'LeftAnkle', 'mixamorigLeftFoot', 'Left_Foot', 'L_Foot', 'foot.L', 'LeftToeBase'],
 
   rightHipPitch: ['rightHipPitch', 'RightUpLeg', 'mixamorigRightUpLeg', 'Right_UpLeg', 'R_UpLeg', 'thigh.R', 'RightUpperLeg'],
   rightHipYaw: ['rightHipYaw', 'RightHip', 'mixamorigRightUpLeg', 'Right_Hip', 'R_Hip'],
   rightKnee: ['rightKnee', 'RightLeg', 'RightKnee', 'mixamorigRightLeg', 'Right_Leg', 'R_Leg', 'shin.R', 'RightLowerLeg'],
-  rightAnkle: ['rightAnkle', 'RightFoot', 'RightAnkle', 'mixamorigRightFoot', 'Right_Foot', 'R_Foot', 'foot.R'],
+  rightAnkle: ['rightAnkle', 'RightFoot', 'RightAnkle', 'mixamorigRightFoot', 'Right_Foot', 'R_Foot', 'foot.R', 'RightToeBase'],
 }
 
 // 관절별 회전 축 및 방향 설정

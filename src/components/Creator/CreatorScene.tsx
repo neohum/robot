@@ -365,6 +365,89 @@ function BodyPartMesh({ part, skinColor, skeletonScale, skeletonType }: BodyPart
   )
 }
 
+// 신체 부위별 설정 (standalone - export에서도 사용)
+function getBodyPartConfig(part: BodyPart, skeletonScale: number, skeletonType: SkeletonType): { position: [number, number, number]; size: [number, number, number]; rotation?: [number, number, number] } {
+  const s = skeletonScale
+  const isHuman = skeletonType.startsWith('human')
+
+  if (isHuman) {
+    switch (part) {
+      case 'head': return { position: [0, 1.7 * s, 0], size: [0.25 * s, 0.3 * s, 0.25 * s] }
+      case 'torso': return { position: [0, 1.1 * s, 0], size: [0.4 * s, 0.5 * s, 0.25 * s] }
+      case 'leftArm': return { position: [-0.35 * s, 1.2 * s, 0], size: [0.12 * s, 0.35 * s, 0.12 * s] }
+      case 'rightArm': return { position: [0.35 * s, 1.2 * s, 0], size: [0.12 * s, 0.35 * s, 0.12 * s] }
+      case 'leftHand': return { position: [-0.35 * s, 0.75 * s, 0], size: [0.08 * s, 0.12 * s, 0.06 * s] }
+      case 'rightHand': return { position: [0.35 * s, 0.75 * s, 0], size: [0.08 * s, 0.12 * s, 0.06 * s] }
+      case 'leftLeg': return { position: [-0.15 * s, 0.45 * s, 0], size: [0.12 * s, 0.4 * s, 0.12 * s] }
+      case 'rightLeg': return { position: [0.15 * s, 0.45 * s, 0], size: [0.12 * s, 0.4 * s, 0.12 * s] }
+      case 'leftFoot': return { position: [-0.15 * s, 0.08 * s, 0.05 * s], size: [0.1 * s, 0.08 * s, 0.18 * s] }
+      case 'rightFoot': return { position: [0.15 * s, 0.08 * s, 0.05 * s], size: [0.1 * s, 0.08 * s, 0.18 * s] }
+      default: return { position: [0, 0, 0], size: [0.1, 0.1, 0.1] }
+    }
+  }
+
+  if (skeletonType === 'quadruped') {
+    switch (part) {
+      case 'head': return { position: [0.45 * s, 0.55 * s, 0], size: [0.15 * s, 0.12 * s, 0.1 * s] }
+      case 'torso': return { position: [0, 0.45 * s, 0], size: [0.5 * s, 0.2 * s, 0.18 * s], rotation: [0, 0, Math.PI / 2] }
+      case 'leftArm': return { position: [0.18 * s, 0.22 * s, 0.1 * s], size: [0.06 * s, 0.28 * s, 0.06 * s] }
+      case 'rightArm': return { position: [0.18 * s, 0.22 * s, -0.1 * s], size: [0.06 * s, 0.28 * s, 0.06 * s] }
+      case 'leftHand': return { position: [0.18 * s, 0.04 * s, 0.1 * s], size: [0.05 * s, 0.04 * s, 0.06 * s] }
+      case 'rightHand': return { position: [0.18 * s, 0.04 * s, -0.1 * s], size: [0.05 * s, 0.04 * s, 0.06 * s] }
+      case 'leftLeg': return { position: [-0.18 * s, 0.22 * s, 0.1 * s], size: [0.07 * s, 0.28 * s, 0.07 * s] }
+      case 'rightLeg': return { position: [-0.18 * s, 0.22 * s, -0.1 * s], size: [0.07 * s, 0.28 * s, 0.07 * s] }
+      case 'leftFoot': return { position: [-0.18 * s, 0.04 * s, 0.1 * s], size: [0.06 * s, 0.04 * s, 0.07 * s] }
+      case 'rightFoot': return { position: [-0.18 * s, 0.04 * s, -0.1 * s], size: [0.06 * s, 0.04 * s, 0.07 * s] }
+      default: return { position: [0, 0, 0], size: [0.1, 0.1, 0.1] }
+    }
+  }
+
+  if (skeletonType === 'biped') {
+    switch (part) {
+      case 'head': return { position: [0.15 * s, 1.1 * s, 0], size: [0.2 * s, 0.15 * s, 0.12 * s] }
+      case 'torso': return { position: [0, 0.65 * s, 0], size: [0.25 * s, 0.45 * s, 0.18 * s], rotation: [0.2, 0, 0] }
+      case 'leftArm': return { position: [0.1 * s, 0.75 * s, 0.12 * s], size: [0.04 * s, 0.12 * s, 0.04 * s], rotation: [0.3, 0, -0.5] }
+      case 'rightArm': return { position: [0.1 * s, 0.75 * s, -0.12 * s], size: [0.04 * s, 0.12 * s, 0.04 * s], rotation: [-0.3, 0, -0.5] }
+      case 'leftHand': return { position: [0.12 * s, 0.65 * s, 0.14 * s], size: [0.03 * s, 0.04 * s, 0.03 * s] }
+      case 'rightHand': return { position: [0.12 * s, 0.65 * s, -0.14 * s], size: [0.03 * s, 0.04 * s, 0.03 * s] }
+      case 'leftLeg': return { position: [-0.02 * s, 0.3 * s, 0.1 * s], size: [0.1 * s, 0.35 * s, 0.1 * s] }
+      case 'rightLeg': return { position: [-0.02 * s, 0.3 * s, -0.1 * s], size: [0.1 * s, 0.35 * s, 0.1 * s] }
+      case 'leftFoot': return { position: [0.05 * s, 0.05 * s, 0.1 * s], size: [0.12 * s, 0.05 * s, 0.1 * s] }
+      case 'rightFoot': return { position: [0.05 * s, 0.05 * s, -0.1 * s], size: [0.12 * s, 0.05 * s, 0.1 * s] }
+      default: return { position: [0, 0, 0], size: [0.1, 0.1, 0.1] }
+    }
+  }
+
+  // bird
+  switch (part) {
+    case 'head': return { position: [0.12 * s, 0.55 * s, 0], size: [0.1 * s, 0.1 * s, 0.08 * s] }
+    case 'torso': return { position: [0, 0.35 * s, 0], size: [0.15 * s, 0.2 * s, 0.12 * s] }
+    case 'leftArm': return { position: [0, 0.4 * s, 0.15 * s], size: [0.18 * s, 0.03 * s, 0.25 * s], rotation: [0.4, 0, 0] }
+    case 'rightArm': return { position: [0, 0.4 * s, -0.15 * s], size: [0.18 * s, 0.03 * s, 0.25 * s], rotation: [-0.4, 0, 0] }
+    case 'leftHand': return { position: [0, 0, 0], size: [0, 0, 0] }
+    case 'rightHand': return { position: [0, 0, 0], size: [0, 0, 0] }
+    case 'leftLeg': return { position: [0.02 * s, 0.15 * s, 0.04 * s], size: [0.02 * s, 0.18 * s, 0.02 * s] }
+    case 'rightLeg': return { position: [0.02 * s, 0.15 * s, -0.04 * s], size: [0.02 * s, 0.18 * s, 0.02 * s] }
+    case 'leftFoot': return { position: [0.04 * s, 0.03 * s, 0.04 * s], size: [0.05 * s, 0.02 * s, 0.04 * s] }
+    case 'rightFoot': return { position: [0.04 * s, 0.03 * s, -0.04 * s], size: [0.05 * s, 0.02 * s, 0.04 * s] }
+    default: return { position: [0, 0, 0], size: [0.1, 0.1, 0.1] }
+  }
+}
+
+// 신체 부위 → 본 매핑 (GLB 내보내기 시 사용)
+const BODY_PART_BONE_MAP: Record<BodyPart, JointName> = {
+  head: 'Head',
+  torso: 'Spine1',
+  leftArm: 'LeftArm',
+  rightArm: 'RightArm',
+  leftHand: 'LeftHand',
+  rightHand: 'RightHand',
+  leftLeg: 'LeftUpLeg',
+  rightLeg: 'RightUpLeg',
+  leftFoot: 'LeftFoot',
+  rightFoot: 'RightFoot',
+}
+
 // 관절 간 뼈 연결선 컴포넌트
 function Bone({ start, end, color = '#666666', thickness = 0.01 }: {
   start: [number, number, number]
@@ -524,21 +607,139 @@ function RobotModel({ skeletonType, skinColor }: RobotModelProps) {
     }
   })
 
-  // GLB 내보내기 이벤트 리스너
+  // GLB 내보내기 이벤트 리스너 - 본-메쉬 계층구조로 내보내기 (애니메이션 지원)
   useEffect(() => {
     const handleExport = (event: CustomEvent) => {
-      if (!groupRef.current) return
+      const { name, skeleton: skelType, skinColor: exportSkinColor } = event.detail
+      const exportSkeletonType = (skelType || skeletonType) as SkeletonType
+      const exportScale = SKELETON_SCALES[exportSkeletonType]
+      const exportColor = exportSkinColor || skinColor
+
+      // 본-메쉬 계층구조 생성
+      const { rootBone, bones } = createSkeleton(exportScale, exportSkeletonType)
+
+      const material = new THREE.MeshStandardMaterial({
+        color: exportColor,
+        metalness: 0.3,
+        roughness: 0.5,
+      })
+
+      // 각 신체 부위를 해당 본의 자식으로 추가
+      const parts: BodyPart[] = ['head', 'torso', 'leftArm', 'rightArm', 'leftHand', 'rightHand', 'leftLeg', 'rightLeg', 'leftFoot', 'rightFoot']
+      const jointPositions = getJointPositions(exportScale, exportSkeletonType)
+
+      for (const part of parts) {
+        const config = getBodyPartConfig(part, exportScale, exportSkeletonType)
+        if (config.size[0] === 0 && config.size[1] === 0 && config.size[2] === 0) continue
+
+        const [w, h, d] = config.size
+        let geometry: THREE.BufferGeometry
+        if (part === 'head') {
+          geometry = new THREE.SphereGeometry(w, 16, 16)
+        } else {
+          geometry = new THREE.CapsuleGeometry(Math.min(w, d) / 2, h - Math.min(w, d), 8, 16)
+        }
+
+        const mesh = new THREE.Mesh(geometry, material.clone())
+        mesh.name = part
+        mesh.castShadow = true
+        mesh.receiveShadow = true
+
+        if (config.rotation) {
+          mesh.rotation.set(config.rotation[0], config.rotation[1], config.rotation[2])
+        }
+
+        // 해당 본에 부착 (본 기준 상대 좌표)
+        const boneName = BODY_PART_BONE_MAP[part]
+        if (boneName && bones[boneName]) {
+          const bonePos = jointPositions[boneName]
+          mesh.position.set(
+            config.position[0] - bonePos[0],
+            config.position[1] - bonePos[1],
+            config.position[2] - bonePos[2]
+          )
+          bones[boneName].add(mesh)
+        }
+      }
+
+      // 동물 특수 부위도 본에 추가
+      const isHumanType = exportSkeletonType.startsWith('human')
+      if (exportSkeletonType === 'quadruped') {
+        const headPos = jointPositions['Head']
+        const hipsPos = jointPositions['Hips']
+        // 귀
+        const ear1 = new THREE.Mesh(new THREE.ConeGeometry(0.03 * exportScale, 0.1 * exportScale, 8), material.clone())
+        ear1.position.set(0.4 * exportScale - headPos[0], 0.65 * exportScale - headPos[1], 0.06 * exportScale - headPos[2])
+        ear1.castShadow = true
+        bones['Head'].add(ear1)
+        const ear2 = new THREE.Mesh(new THREE.ConeGeometry(0.03 * exportScale, 0.1 * exportScale, 8), material.clone())
+        ear2.position.set(0.4 * exportScale - headPos[0], 0.65 * exportScale - headPos[1], -0.06 * exportScale - headPos[2])
+        ear2.castShadow = true
+        bones['Head'].add(ear2)
+        // 주둥이
+        const snout = new THREE.Mesh(new THREE.BoxGeometry(0.08 * exportScale, 0.05 * exportScale, 0.05 * exportScale), material.clone())
+        snout.position.set(0.55 * exportScale - headPos[0], 0.52 * exportScale - headPos[1], -headPos[2])
+        snout.castShadow = true
+        bones['Head'].add(snout)
+        // 꼬리
+        const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.015 * exportScale, 0.03 * exportScale, 0.2 * exportScale, 8), material.clone())
+        tail.position.set(-0.35 * exportScale - hipsPos[0], 0.5 * exportScale - hipsPos[1], -hipsPos[2])
+        tail.rotation.set(0, 0, 0.8)
+        tail.castShadow = true
+        bones['Hips'].add(tail)
+      } else if (exportSkeletonType === 'biped') {
+        const neckPos = jointPositions['Neck']
+        const hipsPos = jointPositions['Hips']
+        // 목 디테일
+        const neckDetail = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * exportScale, 0.07 * exportScale, 0.15 * exportScale, 12), material.clone())
+        neckDetail.position.set(0.08 * exportScale - neckPos[0], 0.95 * exportScale - neckPos[1], -neckPos[2])
+        neckDetail.rotation.set(0, 0, -0.3)
+        neckDetail.castShadow = true
+        bones['Neck'].add(neckDetail)
+        // 꼬리
+        const tail = new THREE.Mesh(new THREE.ConeGeometry(0.06 * exportScale, 0.35 * exportScale, 8), material.clone())
+        tail.position.set(-0.2 * exportScale - hipsPos[0], 0.5 * exportScale - hipsPos[1], -hipsPos[2])
+        tail.rotation.set(0, 0, 0.6)
+        tail.castShadow = true
+        bones['Hips'].add(tail)
+      } else if (exportSkeletonType === 'bird') {
+        const neckPos = jointPositions['Neck']
+        const headPos = jointPositions['Head']
+        const hipsPos = jointPositions['Hips']
+        // 목
+        const neckDetail = new THREE.Mesh(new THREE.CylinderGeometry(0.025 * exportScale, 0.035 * exportScale, 0.1 * exportScale, 10), material.clone())
+        neckDetail.position.set(0.08 * exportScale - neckPos[0], 0.48 * exportScale - neckPos[1], -neckPos[2])
+        neckDetail.rotation.set(0, 0, -0.4)
+        neckDetail.castShadow = true
+        bones['Neck'].add(neckDetail)
+        // 부리
+        const beak = new THREE.Mesh(new THREE.ConeGeometry(0.02 * exportScale, 0.08 * exportScale, 6), new THREE.MeshStandardMaterial({ color: '#FFD700' }))
+        beak.position.set(0.2 * exportScale - headPos[0], 0.53 * exportScale - headPos[1], -headPos[2])
+        beak.rotation.set(0, 0, -Math.PI / 2)
+        beak.castShadow = true
+        bones['Head'].add(beak)
+        // 꼬리 깃털
+        const tailFeathers = new THREE.Mesh(new THREE.BoxGeometry(0.15 * exportScale, 0.02 * exportScale, 0.06 * exportScale), material.clone())
+        tailFeathers.position.set(-0.12 * exportScale - hipsPos[0], 0.32 * exportScale - hipsPos[1], -hipsPos[2])
+        tailFeathers.rotation.set(0, 0, 0.5)
+        tailFeathers.castShadow = true
+        bones['Hips'].add(tailFeathers)
+      }
+
+      // 내보내기
+      const exportGroup = new THREE.Group()
+      exportGroup.add(rootBone)
 
       const exporter = new GLTFExporter()
       exporter.parse(
-        groupRef.current,
+        exportGroup,
         (result) => {
           const output = result as ArrayBuffer
           const blob = new Blob([output], { type: 'application/octet-stream' })
           const url = URL.createObjectURL(blob)
           const link = document.createElement('a')
           link.href = url
-          link.download = `${event.detail.name || 'character'}.glb`
+          link.download = `${name || 'character'}.glb`
           link.click()
           URL.revokeObjectURL(url)
         },
@@ -553,7 +754,7 @@ function RobotModel({ skeletonType, skinColor }: RobotModelProps) {
     return () => {
       window.removeEventListener('exportGLB', handleExport as EventListener)
     }
-  }, [])
+  }, [skeletonType, skinColor])
 
   const bodyParts: BodyPart[] = [
     'head', 'torso', 'leftArm', 'rightArm',
