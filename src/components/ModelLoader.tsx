@@ -15,8 +15,8 @@ interface ModelLoaderProps {
  * 브라우저 업로드는 GLB만 지원 (텍스처 포함)
  */
 export default function ModelLoader({ url, position = [0, 0, 0], scale = 1, rotation = [0, 0, 0] }: ModelLoaderProps) {
-  // useGLTF 훅으로 GLB 로드
-  const { scene } = useGLTF(url)
+  // useGLTF 훅으로 GLB 로드 (DRACO 압축 지원)
+  const { scene } = useGLTF(url, 'https://www.gstatic.com/draco/versioned/decoders/1.5.6/')
 
   // 로드 완료 로그
   useEffect(() => {
@@ -33,7 +33,7 @@ export default function ModelLoader({ url, position = [0, 0, 0], scale = 1, rota
     if (child.isMesh) {
       child.castShadow = true
       child.receiveShadow = true
-      
+
       // 재질 최적화
       if (child.material) {
         child.material.side = THREE.FrontSide
@@ -47,8 +47,8 @@ export default function ModelLoader({ url, position = [0, 0, 0], scale = 1, rota
     }
   })
 
-  const scaleArray: [number, number, number] = Array.isArray(scale) 
-    ? scale 
+  const scaleArray: [number, number, number] = Array.isArray(scale)
+    ? scale
     : [scale, scale, scale]
 
   return (

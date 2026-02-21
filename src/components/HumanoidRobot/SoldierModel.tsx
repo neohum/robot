@@ -22,36 +22,26 @@ export default function SoldierModel({ jointAngles, position = { x: 0, y: 0, z: 
   const group = useRef<THREE.Group>(null)
   const { scene } = useGLTF('/models/Soldier.glb')
 
-  // 모델 복제 (스켈레톤 공유 문제 방지)
-  const clone = useMemo(() => SkeletonUtils.clone(scene), [scene])
+  // 모델 복제 및 본 초기화 (스켈레톤 공유 문제 방지 및 동기 처리)
+  const { clone, bones } = useMemo(() => {
+    const clonedScene = SkeletonUtils.clone(scene)
+    const bonesMap: Record<string, BoneData> = {}
 
-  // 본 참조 및 초기 회전값 저장
-  const bonesRef = useRef<Record<string, BoneData>>({})
-  const initializedRef = useRef(false)
-
-  // 초기화: 본 찾기 및 초기 회전값 저장
-  useEffect(() => {
-    if (initializedRef.current) return
-
-    const bones: Record<string, BoneData> = {}
-
-    clone.traverse((object) => {
-      if ((object as THREE.Bone).isBone) {
+    clonedScene.traverse((object: any) => {
+      if (object.isBone) {
         const bone = object as THREE.Bone
-        bones[bone.name] = {
+        bonesMap[bone.name] = {
           bone,
           initialRotation: bone.rotation.clone()
         }
       }
     })
 
-    bonesRef.current = bones
-    initializedRef.current = true
-  }, [clone])
+    return { clone: clonedScene, bones: bonesMap }
+  }, [scene])
 
   // 매 프레임마다 관절 각도 적용 (초기값 + 델타)
   useFrame(() => {
-    const bones = bonesRef.current
     if (!bones || Object.keys(bones).length === 0) return
 
     // 몸통 (Spine1)
@@ -129,6 +119,12 @@ export default function SoldierModel({ jointAngles, position = { x: 0, y: 0, z: 
       const { bone, initialRotation } = bones['mixamorigRightFoot']
       bone.rotation.x = initialRotation.x + degToRad(jointAngles.rightAnkle)
     }
+
+    // 관절 업데이트 후 매트릭스 수동 갱신
+    Object.values(bones).forEach((data: any) => {
+      data.bone.updateMatrix()
+      data.bone.updateMatrixWorld(true)
+    })
   })
 
   return (
@@ -138,5 +134,3 @@ export default function SoldierModel({ jointAngles, position = { x: 0, y: 0, z: 
   )
 }
 
-// GLTF 프리로드
-useGLTF.preload('/models/Soldier.glb')
