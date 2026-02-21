@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { GLTFLoader, SkeletonUtils } from 'three-stdlib'
+import { GLTFLoader, DRACOLoader, SkeletonUtils } from 'three-stdlib'
 import { HumanoidJointAngles, HumanoidJointKey } from '@/lib/types/robot'
 
 // 본 이름 매핑 - 다양한 명명 규칙 지원
@@ -225,8 +225,8 @@ export default function ExternalModel({
       model.traverse((child) => {
         // 이름이 있고, Mesh가 아닌 Object3D (조작 가능한 노드)
         if (child.name &&
-            !excludeNames.includes(child.name) &&
-            !boneSet.has(child.name)) {
+          !excludeNames.includes(child.name) &&
+          !boneSet.has(child.name)) {
           // Mesh 자체는 제외하고 그룹/노드만 포함
           if (!(child instanceof THREE.Mesh)) {
             boneSet.add(child.name)
@@ -342,6 +342,9 @@ export default function ExternalModel({
     if (loadedUrlRef.current === url && model) return // 이미 로드된 URL이면 스킵
 
     const loader = new GLTFLoader()
+    const dracoLoader = new DRACOLoader()
+    dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/')
+    loader.setDRACOLoader(dracoLoader)
 
     loader.load(
       url,
@@ -517,12 +520,12 @@ export default function ExternalModel({
             bone.rotation.z = initialRot.z + radians
             break
         }
-        
+
         // 디버깅: 회전 적용 후 값 확인
         if (angleChanged && angle !== 0) {
           console.log(`  - 적용 후 rotation.${config.axis}=${bone.rotation[config.axis].toFixed(2)} (radians: ${radians.toFixed(2)})`)
         }
-        
+
         // 회전 적용 후 업데이트 필요
         bone.updateMatrix()
         bone.updateMatrixWorld(true)
