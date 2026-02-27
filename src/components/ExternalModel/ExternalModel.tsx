@@ -5,36 +5,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GLTFLoader, DRACOLoader, SkeletonUtils } from 'three-stdlib'
 import { HumanoidJointAngles, HumanoidJointKey } from '@/lib/types/robot'
-
-// 본 이름 매핑 - 다양한 명명 규칙 지원
-// 각 관절의 첫 번째 항목은 정확히 일치하는 이름 (exact match 우선)
-const BONE_NAME_PATTERNS: Record<HumanoidJointKey, string[]> = {
-  torso: ['torso', 'Spine', 'spine', 'Spine1', 'spine1', 'Spine2', 'spine2', 'mixamorigSpine', 'Torso', 'Chest', 'chest'],
-  neckYaw: ['neckYaw', 'Neck', 'neck', 'mixamorigNeck'],
-  neckPitch: ['neckPitch', 'Head', 'head', 'mixamorigHead'],
-
-  leftShoulderPitch: ['leftShoulderPitch', 'LeftArm', 'mixamorigLeftArm', 'Left_Arm', 'L_Arm', 'Arm.L', 'shoulder.L', 'LeftUpperArm'],
-  leftShoulderYaw: ['leftShoulderYaw', 'LeftShoulder', 'mixamorigLeftShoulder', 'Left_Shoulder', 'L_Shoulder'],
-  leftElbow: ['leftElbow', 'LeftForeArm', 'LeftElbow', 'mixamorigLeftForeArm', 'Left_ForeArm', 'L_ForeArm', 'forearm.L', 'LeftLowerArm'],
-  leftWrist: ['leftWrist', 'LeftHand', 'LeftWrist', 'mixamorigLeftHand', 'Left_Hand', 'L_Hand', 'hand.L'],
-  leftGrip: ['leftGrip', 'LeftHandIndex1', 'LeftHandThumb1', 'mixamorigLeftHandIndex1', 'Left_Finger', 'L_Finger', 'LeftGrip'],
-
-  rightShoulderPitch: ['rightShoulderPitch', 'RightArm', 'mixamorigRightArm', 'Right_Arm', 'R_Arm', 'Arm.R', 'shoulder.R', 'RightUpperArm'],
-  rightShoulderYaw: ['rightShoulderYaw', 'RightShoulder', 'mixamorigRightShoulder', 'Right_Shoulder', 'R_Shoulder'],
-  rightElbow: ['rightElbow', 'RightForeArm', 'RightElbow', 'mixamorigRightForeArm', 'Right_ForeArm', 'R_ForeArm', 'forearm.R', 'RightLowerArm'],
-  rightWrist: ['rightWrist', 'RightHand', 'RightWrist', 'mixamorigRightHand', 'Right_Hand', 'R_Hand', 'hand.R'],
-  rightGrip: ['rightGrip', 'RightHandIndex1', 'RightHandThumb1', 'mixamorigRightHandIndex1', 'Right_Finger', 'R_Finger', 'RightGrip'],
-
-  leftHipPitch: ['leftHipPitch', 'LeftUpLeg', 'mixamorigLeftUpLeg', 'Left_UpLeg', 'L_UpLeg', 'thigh.L', 'LeftUpperLeg'],
-  leftHipYaw: ['leftHipYaw', 'LeftHip', 'mixamorigLeftUpLeg', 'Left_Hip', 'L_Hip'],
-  leftKnee: ['leftKnee', 'LeftLeg', 'LeftKnee', 'mixamorigLeftLeg', 'Left_Leg', 'L_Leg', 'shin.L', 'LeftLowerLeg'],
-  leftAnkle: ['leftAnkle', 'LeftFoot', 'LeftAnkle', 'mixamorigLeftFoot', 'Left_Foot', 'L_Foot', 'foot.L', 'LeftToeBase'],
-
-  rightHipPitch: ['rightHipPitch', 'RightUpLeg', 'mixamorigRightUpLeg', 'Right_UpLeg', 'R_UpLeg', 'thigh.R', 'RightUpperLeg'],
-  rightHipYaw: ['rightHipYaw', 'RightHip', 'mixamorigRightUpLeg', 'Right_Hip', 'R_Hip'],
-  rightKnee: ['rightKnee', 'RightLeg', 'RightKnee', 'mixamorigRightLeg', 'Right_Leg', 'R_Leg', 'shin.R', 'RightLowerLeg'],
-  rightAnkle: ['rightAnkle', 'RightFoot', 'RightAnkle', 'mixamorigRightFoot', 'Right_Foot', 'R_Foot', 'foot.R', 'RightToeBase'],
-}
+import { autoMapBones, toMappingRecord, isStructuralBone } from '@/lib/boneMapping'
 
 // 관절별 회전 축 및 방향 설정
 const JOINT_ROTATION_CONFIG: Record<HumanoidJointKey, { axis: 'x' | 'y' | 'z'; multiplier: number }> = {
@@ -69,6 +40,8 @@ export interface BoneMapping {
   jointKey: HumanoidJointKey
   boneName: string
   bone: THREE.Bone | THREE.Object3D
+  confidence?: number
+  matchPass?: 'exact' | 'prefix-stripped' | 'normalized' | 'word-boundary'
 }
 
 interface ExternalModelProps {
@@ -99,110 +72,15 @@ export default function ExternalModel({
   const groupRef = useRef<THREE.Group>(null)
   const loadedUrlRef = useRef<string | null>(null)
 
-  // 본 찾기 함수 (정확한 이름 매칭 우선 → substring 매칭 폴백)
-  const findBone = useCallback((model: THREE.Group, patterns: string[]): THREE.Bone | THREE.Object3D | null => {
-    let foundBone: THREE.Bone | THREE.Object3D | null = null
-
-    // === PASS 1: 정확한 이름 매칭 (exact match) ===
-    // 관절 이름과 동일한 본 이름을 최우선으로 찾음
-    for (const pattern of patterns) {
-      if (foundBone) break
-      model.traverse((child) => {
-        if (foundBone) return
-        if (child instanceof THREE.Bone && child.name === pattern) {
-          foundBone = child
-        }
-      })
-      if (foundBone) return foundBone
-
-      // SkinnedMesh skeleton에서도 정확 매칭
-      model.traverse((child) => {
-        if (foundBone) return
-        if (child instanceof THREE.SkinnedMesh && child.skeleton) {
-          for (const bone of child.skeleton.bones) {
-            if (bone.name === pattern) {
-              foundBone = bone
-              return
-            }
-          }
-        }
-      })
-      if (foundBone) return foundBone
-
-      // Object3D에서도 정확 매칭
-      model.traverse((child) => {
-        if (foundBone) return
-        if (child instanceof THREE.Object3D && !(child instanceof THREE.Mesh) && child.name === pattern) {
-          foundBone = child
-        }
-      })
-      if (foundBone) return foundBone
-    }
-
-    // === PASS 2: substring 매칭 (기존 방식 폴백) ===
-    // 1. THREE.Bone 직접 탐색
-    model.traverse((child) => {
-      if (foundBone) return
-      if (child instanceof THREE.Bone) {
-        const boneName = child.name.toLowerCase()
-        for (const pattern of patterns) {
-          if (boneName.includes(pattern.toLowerCase())) {
-            foundBone = child
-            return
-          }
-        }
-      }
-    })
-
-    if (foundBone) return foundBone
-
-    // 2. SkinnedMesh skeleton에서 탐색
-    model.traverse((child) => {
-      if (foundBone) return
-      if (child instanceof THREE.SkinnedMesh && child.skeleton) {
-        for (const bone of child.skeleton.bones) {
-          const boneName = bone.name.toLowerCase()
-          for (const pattern of patterns) {
-            if (boneName.includes(pattern.toLowerCase())) {
-              foundBone = bone
-              return
-            }
-          }
-        }
-      }
-    })
-
-    if (foundBone) return foundBone
-
-    // 3. Object3D에서 탐색 (본이 없는 모델용)
-    model.traverse((child) => {
-      if (foundBone) return
-      if (child instanceof THREE.Object3D && !(child instanceof THREE.Mesh)) {
-        const objName = child.name.toLowerCase()
-        for (const pattern of patterns) {
-          if (objName.includes(pattern.toLowerCase())) {
-            foundBone = child
-            return
-          }
-        }
-      }
-    })
-
-    return foundBone
-  }, [])
-
   // 모든 본 이름 수집 (SkinnedMesh의 skeleton도 확인)
   const collectAllBones = useCallback((model: THREE.Group): string[] => {
     const bones: string[] = []
     const boneSet = new Set<string>()
 
-    // 제외할 일반적인 루트/씬 이름
-    const excludeNames = ['Scene', 'AuxScene', 'Root', 'Armature', 'RootNode', 'Sketchfab_model', 'root']
-
     model.traverse((child) => {
       // THREE.Bone 직접 탐색
       if (child instanceof THREE.Bone) {
-        if (!boneSet.has(child.name) && child.name && !excludeNames.includes(child.name)) {
+        if (!boneSet.has(child.name) && child.name && !isStructuralBone(child.name)) {
           boneSet.add(child.name)
           bones.push(child.name)
         }
@@ -211,7 +89,7 @@ export default function ExternalModel({
       // SkinnedMesh에서 skeleton의 bones 탐색
       if (child instanceof THREE.SkinnedMesh && child.skeleton) {
         for (const bone of child.skeleton.bones) {
-          if (!boneSet.has(bone.name) && bone.name && !excludeNames.includes(bone.name)) {
+          if (!boneSet.has(bone.name) && bone.name && !isStructuralBone(bone.name)) {
             boneSet.add(bone.name)
             bones.push(bone.name)
           }
@@ -223,11 +101,9 @@ export default function ExternalModel({
     if (bones.length === 0) {
       console.log('[ExternalModel] 본이 없음, Object3D 구조 탐색 중...')
       model.traverse((child) => {
-        // 이름이 있고, Mesh가 아닌 Object3D (조작 가능한 노드)
         if (child.name &&
-          !excludeNames.includes(child.name) &&
+          !isStructuralBone(child.name) &&
           !boneSet.has(child.name)) {
-          // Mesh 자체는 제외하고 그룹/노드만 포함
           if (!(child instanceof THREE.Mesh)) {
             boneSet.add(child.name)
             bones.push(child.name)
@@ -299,42 +175,38 @@ export default function ExternalModel({
     const mappings: BoneMapping[] = []
     const initRotations = new Map<string, THREE.Euler>()
 
-    const jointKeys = Object.keys(BONE_NAME_PATTERNS) as HumanoidJointKey[]
-
-    for (const jointKey of jointKeys) {
-      let bone: THREE.Bone | THREE.Object3D | null = null
-      let boneName = ''
-
-      // 커스텀 매핑이 있으면 우선 사용
-      if (customMapping && customMapping[jointKey]) {
-        const customName = customMapping[jointKey]
-        bone = findByName(loadedModel, customName)
+    // 커스텀 매핑이 있는 관절은 직접 조회
+    const customMappedJoints = new Set<HumanoidJointKey>()
+    if (customMapping) {
+      for (const [jointKey, customName] of Object.entries(customMapping) as [HumanoidJointKey, string][]) {
+        if (!customName) continue
+        const bone = findByName(loadedModel, customName)
         if (bone) {
-          boneName = customName
+          mappings.push({ jointKey, boneName: customName, bone, confidence: 1.0, matchPass: 'exact' })
+          initRotations.set(customName, bone.rotation.clone())
+          customMappedJoints.add(jointKey)
         }
       }
+    }
 
-      // 커스텀 매핑이 없거나 찾지 못한 경우 자동 매핑
-      if (!bone) {
-        const patterns = BONE_NAME_PATTERNS[jointKey]
-        bone = findBone(loadedModel, patterns)
-        if (bone) {
-          boneName = bone.name
-        }
-      }
-
+    // 커스텀 매핑되지 않은 관절은 자동 매핑
+    const autoResult = autoMapBones(allBones)
+    for (const m of autoResult.mappings) {
+      if (customMappedJoints.has(m.jointKey)) continue
+      const bone = findByName(loadedModel, m.boneName)
       if (bone) {
-        mappings.push({ jointKey, boneName, bone })
-        // 초기 회전값 저장
-        initRotations.set(boneName, bone.rotation.clone())
+        mappings.push({ jointKey: m.jointKey, boneName: m.boneName, bone, confidence: m.confidence, matchPass: m.matchPass })
+        initRotations.set(m.boneName, bone.rotation.clone())
       }
     }
 
     setBoneMappings(mappings)
     setInitialRotations(initRotations)
 
+    console.log(`[ExternalModel] 자동 매핑 신뢰도: ${(autoResult.overallConfidence * 100).toFixed(0)}%`)
+
     return { allBones, mappings }
-  }, [collectAllBones, findBone, findByName])
+  }, [collectAllBones, findByName])
 
   // 모델 로드 (URL이 변경될 때만)
   useEffect(() => {
@@ -351,14 +223,23 @@ export default function ExternalModel({
       (gltf) => {
         const loadedModel = SkeletonUtils.clone(gltf.scene) as THREE.Group
 
+        // 월드 매트릭스 업데이트 (정확한 바운딩 박스 계산을 위해)
+        loadedModel.updateMatrixWorld(true)
+
         // 모델 중심점 계산 및 조정
         const box = new THREE.Box3().setFromObject(loadedModel)
         const center = box.getCenter(new THREE.Vector3())
 
-        // 모델을 바닥에 맞추기
-        loadedModel.position.y = -box.min.y
-        loadedModel.position.x = -center.x
-        loadedModel.position.z = -center.z
+        console.log('[ExternalModel] 바운딩 박스:', {
+          min: { x: box.min.x.toFixed(2), y: box.min.y.toFixed(2), z: box.min.z.toFixed(2) },
+          max: { x: box.max.x.toFixed(2), y: box.max.y.toFixed(2), z: box.max.z.toFixed(2) },
+          rootPos: { x: loadedModel.position.x.toFixed(2), y: loadedModel.position.y.toFixed(2), z: loadedModel.position.z.toFixed(2) }
+        })
+
+        // 모델을 바닥에 맞추기 (기존 루트 위치를 보정하는 -= 사용)
+        loadedModel.position.y -= box.min.y
+        loadedModel.position.x -= center.x
+        loadedModel.position.z -= center.z
 
         // 그림자 설정
         loadedModel.traverse((child) => {

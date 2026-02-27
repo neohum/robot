@@ -10,7 +10,7 @@ import type { ModelType } from '@/components/Scene/RobotScene'
 import { AnimationController } from '@/lib/animationController'
 import { generateCode } from '@/lib/blockly/codeGenerator'
 import { generatePythonCode } from '@/lib/blockly/pythonGenerator'
-import { saveProject, loadProject, getAllProjects, deleteProject, saveCurrentWorkspace, loadCurrentWorkspace, SavedProject, saveExternalModel, getAllExternalModels, deleteExternalModel, loadCurrentExternalModel, saveCurrentExternalModel, testExternalModelSync, SavedExternalModel, saveBoneMapping, loadBoneMapping, SavedBoneMapping, uploadModelToWasabi, getModelsFromWasabi, getModelUrlFromWasabi, updateModelMetadataInWasabi, saveBackgroundModel, getAllBackgroundModels, deleteBackgroundModel } from '@/lib/storage'
+import { saveProject, loadProject, getAllProjects, deleteProject, saveCurrentWorkspace, loadCurrentWorkspace, SavedProject, saveExternalModel, getAllExternalModels, deleteExternalModel, loadCurrentExternalModel, saveCurrentExternalModel, testExternalModelSync, SavedExternalModel, saveBoneMapping, loadBoneMapping, SavedBoneMapping, uploadModelToWasabi, getModelsFromWasabi, getModelUrlFromWasabi, deleteModelFromWasabi, updateModelMetadataInWasabi, saveBackgroundModel, getAllBackgroundModels, deleteBackgroundModel, saveCurrentBackgroundModel, loadCurrentBackgroundModel, clearCurrentBackgroundModel } from '@/lib/storage'
 import type { BoneMapping } from '@/components/ExternalModel/ExternalModel'
 import { EXAMPLE_PROGRAMS } from '@/lib/examples'
 import ControlPanel from '@/components/Controls/ControlPanel'
@@ -68,6 +68,7 @@ export default function Home() {
   const [isMappingTesting, setIsMappingTesting] = useState(false)
   const [showPythonHelp, setShowPythonHelp] = useState(false)
   const [backgroundModelUrl, setBackgroundModelUrl] = useState<string>('')
+  const [backgroundModelName, setBackgroundModelName] = useState<string>('')
   const [backgroundModelScale, setBackgroundModelScale] = useState<number>(1)
   const [showBackgroundDialog, setShowBackgroundDialog] = useState(false)
   const [savedBackgroundModels, setSavedBackgroundModels] = useState<SavedExternalModel[]>([])
@@ -183,6 +184,30 @@ export default function Home() {
       console.log('[Simulator] Blob URL 만료됨, 모델 초기화')
       // 만료된 blob URL은 저장소에서도 제거
       localStorage.removeItem('robot-external-model-current')
+    }
+
+    // 마지막으로 사용한 배경 모델 복원
+    const currentBg = loadCurrentBackgroundModel()
+    if (currentBg && !currentBg.url.startsWith('blob:')) {
+      setBackgroundModelUrl(currentBg.url)
+      if (currentBg.name) setBackgroundModelName(currentBg.name)
+      if (currentBg.scale !== undefined) setBackgroundModelScale(currentBg.scale)
+
+      // Wasabi presigned URL 만료 시 재생성
+      if (currentBg.url.includes('wasabisys.com') && currentBg.name) {
+        const modelId = localStorage.getItem(`wasabi-model-id-${currentBg.name}`)
+        if (modelId) {
+          getModelUrlFromWasabi(modelId).then(result => {
+            if (result.success && result.url) {
+              console.log('[Simulator] 배경 Wasabi URL 갱신됨')
+              setBackgroundModelUrl(result.url)
+              saveCurrentBackgroundModel(result.url, currentBg.name, currentBg.scale)
+            }
+          })
+        }
+      }
+    } else if (currentBg?.url.startsWith('blob:')) {
+      clearCurrentBackgroundModel()
     }
   }, [])
 
@@ -329,17 +354,17 @@ export default function Home() {
     const currentAngles = jointAnglesRef.current
 
     if (isLeftStep) {
-      // 왼발 앞으로
+      // 왼발 앞으로 (음수 hipPitch = 앞으로)
       const stepPose: HumanoidJointAngles = {
         ...currentAngles,
-        leftHipPitch: 25,
+        leftHipPitch: -25,
         leftKnee: 35,
         leftAnkle: -10,
-        rightHipPitch: -15,
+        rightHipPitch: 15,
         rightKnee: 5,
         rightAnkle: 5,
-        leftShoulderPitch: -20,
-        rightShoulderPitch: 20,
+        rightShoulderPitch: -20,
+        leftShoulderPitch: 15,
         leftShoulderYaw: 10,
         rightShoulderYaw: -10,
       }
@@ -350,17 +375,17 @@ export default function Home() {
         setJointAngles
       )
     } else {
-      // 오른발 앞으로
+      // 오른발 앞으로 (음수 hipPitch = 앞으로)
       const stepPose: HumanoidJointAngles = {
         ...currentAngles,
-        rightHipPitch: 25,
+        rightHipPitch: -25,
         rightKnee: 35,
         rightAnkle: -10,
-        leftHipPitch: -15,
+        leftHipPitch: 15,
         leftKnee: 5,
         leftAnkle: 5,
-        rightShoulderPitch: -20,
-        leftShoulderPitch: 20,
+        leftShoulderPitch: -20,
+        rightShoulderPitch: 15,
         leftShoulderYaw: 10,
         rightShoulderYaw: -10,
       }
@@ -967,6 +992,7 @@ export default function Home() {
       // 즉시 Blob URL로 미리보기
       const blobUrl = URL.createObjectURL(file)
       setBackgroundModelUrl(blobUrl)
+      setBackgroundModelName(name)
 
       // 백그라운드에서 Wasabi에 업로드
       toast.promise(
@@ -977,6 +1003,7 @@ export default function Home() {
             if (result.success && result.url && result.id) {
               setBackgroundModelUrl(result.url)
               saveBackgroundModel(name, result.url, 'url')
+              saveCurrentBackgroundModel(result.url, name, backgroundModelScale)
               setSavedBackgroundModels(getAllBackgroundModels())
               URL.revokeObjectURL(blobUrl)
               localStorage.setItem(`wasabi-model-id-${name}`, result.id)
@@ -1000,6 +1027,8 @@ export default function Home() {
       URL.revokeObjectURL(backgroundModelUrl)
     }
     setBackgroundModelUrl('')
+    setBackgroundModelName('')
+    clearCurrentBackgroundModel()
     toast.success('배경 모델이 제거되었습니다')
   }
 
@@ -1026,6 +1055,8 @@ export default function Home() {
     }
 
     setBackgroundModelUrl(url)
+    setBackgroundModelName(model.name)
+    saveCurrentBackgroundModel(url, model.name, model.scale)
     toast.success(`배경: "${model.name}"`)
   }
 
@@ -1061,10 +1092,22 @@ export default function Home() {
     toast.success(`"${model.name}" 모델을 불러왔습니다!`)
   }
 
-  // 저장된 외부 모델 삭제
-  const handleDeleteSavedExternalModel = (name: string) => {
+  // 저장된 외부 모델 삭제 (localStorage + Wasabi)
+  const handleDeleteSavedExternalModel = async (name: string) => {
     deleteExternalModel(name)
     setSavedExternalModels(getAllExternalModels())
+
+    // Wasabi에서도 삭제
+    const wasabiModelId = localStorage.getItem(`wasabi-model-id-${name}`)
+    if (wasabiModelId) {
+      const deleted = await deleteModelFromWasabi(wasabiModelId)
+      if (deleted) {
+        localStorage.removeItem(`wasabi-model-id-${name}`)
+      } else {
+        console.warn(`[Simulator] Wasabi 모델 삭제 실패: ${name}`)
+      }
+    }
+
     toast.success('모델이 삭제되었습니다')
   }
 
@@ -1549,7 +1592,11 @@ export default function Home() {
                     max="10"
                     step="0.01"
                     value={backgroundModelScale}
-                    onChange={(e) => setBackgroundModelScale(parseFloat(e.target.value))}
+                    onChange={(e) => {
+                      const newScale = parseFloat(e.target.value)
+                      setBackgroundModelScale(newScale)
+                      saveCurrentBackgroundModel(backgroundModelUrl, backgroundModelName, newScale)
+                    }}
                     className="flex-1 h-1 accent-teal-500"
                   />
                   <span className="text-xs text-gray-300 w-10 text-right">{backgroundModelScale.toFixed(2)}</span>
@@ -1895,9 +1942,21 @@ export default function Home() {
                             배경으로 사용
                           </button>
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               deleteBackgroundModel(model.name)
                               setSavedBackgroundModels(getAllBackgroundModels())
+
+                              // Wasabi에서도 삭제
+                              const wasabiModelId = localStorage.getItem(`wasabi-model-id-${model.name}`)
+                              if (wasabiModelId) {
+                                const deleted = await deleteModelFromWasabi(wasabiModelId)
+                                if (deleted) {
+                                  localStorage.removeItem(`wasabi-model-id-${model.name}`)
+                                } else {
+                                  console.warn(`[Simulator] Wasabi 배경 모델 삭제 실패: ${model.name}`)
+                                }
+                              }
+
                               toast.success('배경 모델이 삭제되었습니다')
                             }}
                             className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded"

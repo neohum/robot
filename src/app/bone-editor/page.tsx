@@ -12,6 +12,7 @@ import {
   saveBoneMappingToServer,
   loadBoneMappingFromServer
 } from '@/lib/storage'
+import { autoMapBones, toMappingRecord, getConfidenceLabel, type AutoMappingResult } from '@/lib/boneMapping'
 
 // 파트 타입 정의
 interface ModelPart {
@@ -95,30 +96,6 @@ const PART_PRESETS = [
   { id: 'rightLeg', name: '오른다리', joints: ['rightHipPitch', 'rightHipYaw', 'rightKnee', 'rightAnkle'] as HumanoidJointKey[] },
 ]
 
-// 자동 매핑 패턴
-const AUTO_MAPPING_PATTERNS: Record<HumanoidJointKey, string[]> = {
-  torso: ['Spine', 'spine', 'Torso', 'torso', 'Hips', 'hips', 'mixamorigSpine'],
-  neckYaw: ['Neck', 'neck', 'mixamorigNeck'],
-  neckPitch: ['Head', 'head', 'mixamorigHead'],
-  leftShoulderPitch: ['LeftArm', 'LeftShoulder', 'mixamorigLeftArm', 'Left_Arm', 'L_Arm', 'Arm.L', 'shoulder.L', 'LeftUpperArm'],
-  leftShoulderYaw: ['LeftShoulder', 'mixamorigLeftShoulder', 'Left_Shoulder', 'L_Shoulder'],
-  leftElbow: ['LeftForeArm', 'LeftElbow', 'mixamorigLeftForeArm', 'Left_Elbow', 'L_Elbow', 'forearm.L', 'LeftLowerArm'],
-  leftWrist: ['LeftHand', 'LeftWrist', 'mixamorigLeftHand', 'Left_Hand', 'L_Hand', 'hand.L'],
-  leftGrip: ['LeftHandIndex', 'LeftFinger', 'mixamorigLeftHandIndex1'],
-  rightShoulderPitch: ['RightArm', 'RightShoulder', 'mixamorigRightArm', 'Right_Arm', 'R_Arm', 'Arm.R', 'shoulder.R', 'RightUpperArm'],
-  rightShoulderYaw: ['RightShoulder', 'mixamorigRightShoulder', 'Right_Shoulder', 'R_Shoulder'],
-  rightElbow: ['RightForeArm', 'RightElbow', 'mixamorigRightForeArm', 'Right_Elbow', 'R_Elbow', 'forearm.R', 'RightLowerArm'],
-  rightWrist: ['RightHand', 'RightWrist', 'mixamorigRightHand', 'Right_Hand', 'R_Hand', 'hand.R'],
-  rightGrip: ['RightHandIndex', 'RightFinger', 'mixamorigRightHandIndex1'],
-  leftHipPitch: ['LeftUpLeg', 'LeftHip', 'mixamorigLeftUpLeg', 'Left_UpLeg', 'L_UpLeg', 'thigh.L', 'LeftUpperLeg'],
-  leftHipYaw: ['LeftUpLeg', 'mixamorigLeftUpLeg'],
-  leftKnee: ['LeftLeg', 'LeftKnee', 'mixamorigLeftLeg', 'Left_Leg', 'L_Leg', 'shin.L', 'LeftLowerLeg'],
-  leftAnkle: ['LeftFoot', 'LeftAnkle', 'mixamorigLeftFoot', 'Left_Foot', 'L_Foot', 'foot.L'],
-  rightHipPitch: ['RightUpLeg', 'RightHip', 'mixamorigRightUpLeg', 'Right_UpLeg', 'R_UpLeg', 'thigh.R', 'RightUpperLeg'],
-  rightHipYaw: ['RightUpLeg', 'mixamorigRightUpLeg'],
-  rightKnee: ['RightLeg', 'RightKnee', 'mixamorigRightLeg', 'Right_Leg', 'R_Leg', 'shin.R', 'RightLowerLeg'],
-  rightAnkle: ['RightFoot', 'RightAnkle', 'mixamorigRightFoot', 'Right_Foot', 'R_Foot', 'foot.R']
-}
 
 // 3D 모델 뷰어 컴포넌트
 function PartsViewer({
@@ -333,27 +310,13 @@ export default function BoneEditorPage() {
     return { bones, nodes, hasBones }
   }, [])
 
-  // 자동 매핑
+  // 자동 매핑 (공유 모듈 사용)
+  const [lastAutoResult, setLastAutoResult] = useState<AutoMappingResult | null>(null)
+
   const autoMapping = useCallback((bones: string[], allowedJoints?: HumanoidJointKey[]) => {
-    const newMapping: Partial<Record<HumanoidJointKey, string>> = {}
-
-    const jointsToMap = allowedJoints || (Object.keys(AUTO_MAPPING_PATTERNS) as HumanoidJointKey[])
-
-    for (const jointKey of jointsToMap) {
-      const patterns = AUTO_MAPPING_PATTERNS[jointKey]
-      for (const pattern of patterns) {
-        const found = bones.find(bone =>
-          bone.toLowerCase().includes(pattern.toLowerCase()) ||
-          pattern.toLowerCase().includes(bone.toLowerCase())
-        )
-        if (found && !Object.values(newMapping).includes(found)) {
-          newMapping[jointKey] = found
-          break
-        }
-      }
-    }
-
-    return newMapping
+    const result = autoMapBones(bones, allowedJoints)
+    setLastAutoResult(result)
+    return toMappingRecord(result)
   }, [])
 
   // 새 파트 추가
@@ -855,6 +818,8 @@ export default function BoneEditorPage() {
                   {group.joints.map(joint => {
                     const mappedBone = selectedPart?.mapping[joint]
                     const isSelected = selectedJoint === joint
+                    const autoMatchInfo = lastAutoResult?.mappings.find(m => m.jointKey === joint)
+                    const confidenceLabel = autoMatchInfo ? getConfidenceLabel(autoMatchInfo.confidence) : null
 
                     return (
                       <div
@@ -867,7 +832,12 @@ export default function BoneEditorPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-white text-sm truncate">{JOINT_LABELS[joint]}</p>
                           {mappedBone ? (
-                            <p className="text-green-400 text-xs truncate">{mappedBone}</p>
+                            <p className="text-green-400 text-xs truncate">
+                              {mappedBone}
+                              {confidenceLabel && (
+                                <span className={`ml-1 ${confidenceLabel.color}`}>[{confidenceLabel.text}]</span>
+                              )}
+                            </p>
                           ) : (
                             <p className="text-gray-500 text-xs">미매핑</p>
                           )}

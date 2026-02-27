@@ -361,6 +361,22 @@ export const deleteBackgroundModel = (name: string): void => {
   localStorage.setItem(BACKGROUND_MODEL_KEY, JSON.stringify(models));
 };
 
+// 현재 선택된 배경 모델 저장
+export const saveCurrentBackgroundModel = (url: string, name?: string, scale?: number): void => {
+  localStorage.setItem(BACKGROUND_MODEL_KEY + '-current', JSON.stringify({ url, name, scale, timestamp: Date.now() }));
+};
+
+// 현재 선택된 배경 모델 불러오기
+export const loadCurrentBackgroundModel = (): { url: string; name?: string; scale?: number } | null => {
+  const data = localStorage.getItem(BACKGROUND_MODEL_KEY + '-current');
+  return data ? JSON.parse(data) : null;
+};
+
+// 현재 배경 모델 설정 제거
+export const clearCurrentBackgroundModel = (): void => {
+  localStorage.removeItem(BACKGROUND_MODEL_KEY + '-current');
+};
+
 // ============================================
 // Wasabi 서버 기반 외부 모델 함수들
 // ============================================
