@@ -93,11 +93,11 @@ export async function POST(request: NextRequest) {
       { expiresIn: 3600 }
     )
 
-    return NextResponse.json({ 
-      success: true, 
-      id, 
+    return NextResponse.json({
+      success: true,
+      id,
       url,
-      metadata 
+      metadata
     })
   } catch (error: any) {
     console.error('Upload error:', error)
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     // 특정 모델의 URL 가져오기
     if (id) {
       const key = `${MODELS_PREFIX}${id}`
-      
+
       // Presigned URL 생성 (1시간 유효)
       const url = await getSignedUrl(
         getWasabiClient(),
@@ -141,11 +141,11 @@ export async function GET(request: NextRequest) {
         if (metaResponse.Body) {
           const bodyString = await metaResponse.Body.transformToString()
           const metadata = JSON.parse(bodyString)
-          
-          return NextResponse.json({ 
-            success: true, 
+
+          return NextResponse.json({
+            success: true,
             url,
-            metadata 
+            metadata
           })
         }
       } catch (e) {
@@ -243,7 +243,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Wasabi storage not configured' }, { status: 503 })
   }
   try {
-    const { id, boneMapping, scale } = await request.json()
+    const { id, boneMapping, scale, modelType } = await request.json()
 
     if (!id) {
       return NextResponse.json({ error: 'No id provided' }, { status: 400 })
@@ -276,6 +276,9 @@ export async function PUT(request: NextRequest) {
     }
     if (scale !== undefined) {
       metadata.scale = scale
+    }
+    if (modelType !== undefined) {
+      metadata.modelType = modelType
     }
 
     // 업데이트된 메타데이터 저장

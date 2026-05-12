@@ -78,6 +78,7 @@ interface ExternalModelProps {
   jointAngles?: HumanoidJointAngles
   onBonesFound?: (bones: string[], mappings: BoneMapping[]) => void
   customBoneMapping?: Record<HumanoidJointKey, string>
+  boneOffsets?: Record<HumanoidJointKey, number> // 관절별 기본 오프셋 (도)
 }
 
 function degToRad(deg: number): number {
@@ -90,7 +91,8 @@ export default function ExternalModel({
   position = { x: 0, y: 0, z: 0 },
   jointAngles,
   onBonesFound,
-  customBoneMapping
+  customBoneMapping,
+  boneOffsets,
 }: ExternalModelProps) {
   const [model, setModel] = useState<THREE.Group | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -507,17 +509,18 @@ export default function ExternalModel({
         }
 
         const radians = degToRad(angle * config.multiplier)
+        const offsetRadians = boneOffsets ? degToRad((boneOffsets[jointKey] ?? 0) * config.multiplier) : 0
 
-        // 초기 회전값에 관절 각도를 더함
+        // 초기 회전값 + 오프셋 + 관절 각도
         switch (config.axis) {
           case 'x':
-            bone.rotation.x = initialRot.x + radians
+            bone.rotation.x = initialRot.x + offsetRadians + radians
             break
           case 'y':
-            bone.rotation.y = initialRot.y + radians
+            bone.rotation.y = initialRot.y + offsetRadians + radians
             break
           case 'z':
-            bone.rotation.z = initialRot.z + radians
+            bone.rotation.z = initialRot.z + offsetRadians + radians
             break
         }
 

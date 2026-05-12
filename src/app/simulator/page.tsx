@@ -36,6 +36,71 @@ type EditorMode = 'block' | 'python'
 
 const DEFAULT_POSITION: Position3D = { x: 0, y: 0, z: 0 }
 
+const JOINT_DISPLAY_NAMES: Record<HumanoidJointKey, string> = {
+  torso: '몸통',
+  neckYaw: '목 (좌우)',
+  neckPitch: '목 (앞뒤)',
+  leftShoulderPitch: '왼쪽 어깨 (앞뒤)',
+  leftShoulderYaw: '왼쪽 어깨 (회전)',
+  leftElbow: '왼쪽 팔꿈치',
+  leftWrist: '왼쪽 손목',
+  leftGrip: '왼쪽 그립',
+  rightShoulderPitch: '오른쪽 어깨 (앞뒤)',
+  rightShoulderYaw: '오른쪽 어깨 (회전)',
+  rightElbow: '오른쪽 팔꿈치',
+  rightWrist: '오른쪽 손목',
+  rightGrip: '오른쪽 그립',
+  leftHipPitch: '왼쪽 엉덩이 (앞뒤)',
+  leftHipYaw: '왼쪽 엉덩이 (회전)',
+  leftKnee: '왼쪽 무릎',
+  leftAnkle: '왼쪽 발목',
+  rightHipPitch: '오른쪽 엉덩이 (앞뒤)',
+  rightHipYaw: '오른쪽 엉덩이 (회전)',
+  rightKnee: '오른쪽 무릎',
+  rightAnkle: '오른쪽 발목',
+}
+
+// 본 이름 패턴 → 한글 번역 (표시용, 내부 값은 원본 유지)
+const BONE_TRANSLATION_RULES: Array<{ pattern: RegExp; label: string }> = [
+  // 척추 / 몸통
+  { pattern: /^(mixamorig:?)?(Hips|hips|Hip|Pelvis|pelvis)$/i, label: '골반' },
+  { pattern: /^(mixamorig:?)?(Spine2?|spine2?|Chest|chest|Torso|torso)$/i, label: '척추/몸통' },
+  { pattern: /^(mixamorig:?)?(Spine[123]|spine[123]|UpperChest|upperchest)$/i, label: '상부 척추' },
+  // 목 / 머리
+  { pattern: /^(mixamorig:?)?(Neck|neck|Neck[123]?)$/i, label: '목' },
+  { pattern: /^(mixamorig:?)?(Head|head|HeadTop|headtop)$/i, label: '머리' },
+  // 왼팔
+  { pattern: /^(mixamorig:?)?(LeftShoulder|Left_Shoulder|L_Shoulder|shoulder\.L)$/i, label: '왼쪽 쇄골' },
+  { pattern: /^(mixamorig:?)?(LeftArm|Left_Arm|L_Arm|Arm\.L|LeftUpperArm)$/i, label: '왼쪽 위팔' },
+  { pattern: /^(mixamorig:?)?(LeftForeArm|LeftElbow|Left_ForeArm|L_ForeArm|forearm\.L|LeftLowerArm)$/i, label: '왼쪽 팔꿈치/아래팔' },
+  { pattern: /^(mixamorig:?)?(LeftHand|LeftWrist|Left_Hand|L_Hand|hand\.L)$/i, label: '왼쪽 손' },
+  { pattern: /^(mixamorig:?)?(LeftHandIndex[123]?|LeftHandThumb[123]?|Left_Finger|L_Finger|LeftGrip)$/i, label: '왼쪽 손가락' },
+  // 오른팔
+  { pattern: /^(mixamorig:?)?(RightShoulder|Right_Shoulder|R_Shoulder|shoulder\.R)$/i, label: '오른쪽 쇄골' },
+  { pattern: /^(mixamorig:?)?(RightArm|Right_Arm|R_Arm|Arm\.R|RightUpperArm)$/i, label: '오른쪽 위팔' },
+  { pattern: /^(mixamorig:?)?(RightForeArm|RightElbow|Right_ForeArm|R_ForeArm|forearm\.R|RightLowerArm)$/i, label: '오른쪽 팔꿈치/아래팔' },
+  { pattern: /^(mixamorig:?)?(RightHand|RightWrist|Right_Hand|R_Hand|hand\.R)$/i, label: '오른쪽 손' },
+  { pattern: /^(mixamorig:?)?(RightHandIndex[123]?|RightHandThumb[123]?|Right_Finger|R_Finger|RightGrip)$/i, label: '오른쪽 손가락' },
+  // 왼다리
+  { pattern: /^(mixamorig:?)?(LeftUpLeg|Left_UpLeg|L_UpLeg|thigh\.L|LeftUpperLeg)$/i, label: '왼쪽 허벅지' },
+  { pattern: /^(mixamorig:?)?(LeftLeg|LeftKnee|Left_Leg|L_Leg|shin\.L|LeftLowerLeg)$/i, label: '왼쪽 무릎/정강이' },
+  { pattern: /^(mixamorig:?)?(LeftFoot|LeftAnkle|Left_Foot|L_Foot|foot\.L)$/i, label: '왼쪽 발' },
+  { pattern: /^(mixamorig:?)?(LeftToeBase|LeftToe|toe\.L)$/i, label: '왼쪽 발가락' },
+  // 오른다리
+  { pattern: /^(mixamorig:?)?(RightUpLeg|Right_UpLeg|R_UpLeg|thigh\.R|RightUpperLeg)$/i, label: '오른쪽 허벅지' },
+  { pattern: /^(mixamorig:?)?(RightLeg|RightKnee|Right_Leg|R_Leg|shin\.R|RightLowerLeg)$/i, label: '오른쪽 무릎/정강이' },
+  { pattern: /^(mixamorig:?)?(RightFoot|RightAnkle|Right_Foot|R_Foot|foot\.R)$/i, label: '오른쪽 발' },
+  { pattern: /^(mixamorig:?)?(RightToeBase|RightToe|toe\.R)$/i, label: '오른쪽 발가락' },
+]
+
+function translateBoneName(boneName: string): string {
+  for (const { pattern, label } of BONE_TRANSLATION_RULES) {
+    if (pattern.test(boneName)) return `${label} (${boneName})`
+  }
+  return boneName // 매칭 없으면 원본 그대로
+}
+
+
 export default function Home() {
   const [jointAngles, setJointAngles] = useState<HumanoidJointAngles>({
     ...DEFAULT_HUMANOID_POSE
@@ -64,6 +129,9 @@ export default function Home() {
   const [availableBones, setAvailableBones] = useState<string[]>([])
   const [currentBoneMappings, setCurrentBoneMappings] = useState<BoneMapping[]>([])
   const [customBoneMapping, setCustomBoneMapping] = useState<Record<HumanoidJointKey, string>>({} as Record<HumanoidJointKey, string>)
+  const [boneOffsets, setBoneOffsets] = useState<Record<HumanoidJointKey, number>>({} as Record<HumanoidJointKey, number>)
+  const [boneMappingPanelPos, setBoneMappingPanelPos] = useState({ x: 200, y: 16 })
+  const boneMappingDragRef = useRef<{ startX: number; startY: number; initX: number; initY: number } | null>(null)
   const [mappingTestResult, setMappingTestResult] = useState<string>('')
   const [isMappingTesting, setIsMappingTesting] = useState(false)
   const [showPythonHelp, setShowPythonHelp] = useState(false)
@@ -71,6 +139,8 @@ export default function Home() {
   const [backgroundModelScale, setBackgroundModelScale] = useState<number>(1)
   const [showBackgroundDialog, setShowBackgroundDialog] = useState(false)
   const [savedBackgroundModels, setSavedBackgroundModels] = useState<SavedExternalModel[]>([])
+  const [wasabiModels, setWasabiModels] = useState<import('@/lib/storage').WasabiExternalModel[]>([])
+  const [wasabiModelsLoading, setWasabiModelsLoading] = useState(false)
 
   const animationController = useRef(new AnimationController())
   const executionSpeedRef = useRef(executionSpeed)
@@ -105,6 +175,14 @@ export default function Home() {
     return baseDuration / executionSpeedRef.current
   }
 
+  // 외부 모델 다이얼로그가 열릴 때 자동으로 Wasabi 모델 목록 불러오기
+  useEffect(() => {
+    if (showExternalModelDialog) {
+      handleLoadWasabiModels()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showExternalModelDialog])
+
   useEffect(() => {
     const saved = loadCurrentWorkspace()
     if (saved) {
@@ -128,22 +206,18 @@ export default function Home() {
       for (const wm of wasabiModels) {
         localStorage.setItem(`wasabi-model-id-${wm.name}`, wm.id)
         const isBackground = wm.modelType === 'background'
+        // proxy URL 사용 (presigned URL은 CORS 문제 발생)
+        const proxyUrl = `/api/wasabi-proxy/external-models/${wm.id}`
 
         if (isBackground) {
           if (!localBgNames.has(wm.name)) {
-            const result = await getModelUrlFromWasabi(wm.id)
-            if (result.success && result.url) {
-              saveBackgroundModel(wm.name, result.url, 'url')
-              console.log(`[Simulator] Wasabi 배경 모델 동기화: ${wm.name}`)
-            }
+            saveBackgroundModel(wm.name, proxyUrl, 'url')
+            console.log(`[Simulator] Wasabi 배경 모델 동기화: ${wm.name}`)
           }
         } else {
           if (!localCharNames.has(wm.name)) {
-            const result = await getModelUrlFromWasabi(wm.id)
-            if (result.success && result.url) {
-              saveExternalModel(wm.name, result.url, 'url')
-              console.log(`[Simulator] Wasabi 모델 동기화: ${wm.name}`)
-            }
+            saveExternalModel(wm.name, proxyUrl, 'url')
+            console.log(`[Simulator] Wasabi 모델 동기화: ${wm.name}`)
           }
         }
       }
@@ -159,7 +233,7 @@ export default function Home() {
       setExternalModelUrl(currentExternal.url)
       setExternalModelName(currentExternal.name || '')
       setModelType('external')
-      
+
       // URL이 Wasabi presigned URL이고 만료되었을 수 있으므로 재생성
       if (currentExternal.url.includes('wasabisys.com')) {
         const modelId = localStorage.getItem(`wasabi-model-id-${currentExternal.name}`)
@@ -169,7 +243,7 @@ export default function Home() {
               console.log('[Simulator] Wasabi URL 갱신됨')
               setExternalModelUrl(result.url)
               saveCurrentExternalModel(result.url, currentExternal.name || '')
-              
+
               // 메타데이터에 본 매핑이 있으면 불러오기
               if (result.metadata?.boneMapping) {
                 setCustomBoneMapping(result.metadata.boneMapping as Record<HumanoidJointKey, string>)
@@ -893,7 +967,7 @@ export default function Home() {
     const file = e.target.files?.[0]
     if (file) {
       const name = file.name.replace(/\.(glb|gltf)$/i, '')
-      
+
       // 즉시 Blob URL로 미리보기 시작
       const blobUrl = URL.createObjectURL(file)
       boneMappingLoadedRef.current = false
@@ -902,7 +976,7 @@ export default function Home() {
       setExternalModelName(name)
       setModelType('external')
       setShowExternalModelDialog(false)
-      
+
       // 백그라운드에서 Wasabi에 업로드
       toast.promise(
         uploadModelToWasabi(file, customBoneMapping),
@@ -1037,19 +1111,23 @@ export default function Home() {
 
     let url = model.url
 
-    // Wasabi presigned URL이면 갱신 (만료 방지)
+    // Wasabi presigned URL이면 proxy URL로 교체 (CORS 문제 방지)
     if (url.includes('wasabisys.com')) {
       const modelId = localStorage.getItem(`wasabi-model-id-${model.name}`)
       if (modelId) {
-        const result = await getModelUrlFromWasabi(modelId)
-        if (result.success && result.url) {
-          url = result.url
-          saveExternalModel(model.name, url, 'url', model.scale)
-          setSavedExternalModels(getAllExternalModels())
+        // presigned URL 대신 proxy URL 사용
+        url = `/api/wasabi-proxy/external-models/${modelId}`
+        saveExternalModel(model.name, url, 'url', model.scale)
+        setSavedExternalModels(getAllExternalModels())
 
+        // 본 매핑 메타데이터 조회
+        try {
+          const result = await getModelUrlFromWasabi(modelId)
           if (result.metadata?.boneMapping) {
             setCustomBoneMapping(result.metadata.boneMapping as Record<HumanoidJointKey, string>)
           }
+        } catch (e) {
+          console.warn('본 매핑 메타데이터 조회 실패:', e)
         }
       }
     }
@@ -1066,6 +1144,71 @@ export default function Home() {
     deleteExternalModel(name)
     setSavedExternalModels(getAllExternalModels())
     toast.success('모델이 삭제되었습니다')
+  }
+
+  // Wasabi 클라우드 모델 목록 불러오기
+  const handleLoadWasabiModels = async () => {
+    setWasabiModelsLoading(true)
+    try {
+      const models = await getModelsFromWasabi()
+      setWasabiModels(models.filter(m => m.modelType !== 'background'))
+    } catch (error) {
+      console.error('Wasabi 모델 로드 오류:', error)
+    } finally {
+      setWasabiModelsLoading(false)
+    }
+  }
+
+  // Wasabi 클라우드 모델 불러오기 (proxy URL 사용 - CORS 문제 없음)
+  const handleLoadWasabiModel = async (model: import('@/lib/storage').WasabiExternalModel) => {
+    boneMappingLoadedRef.current = false
+    setCustomBoneMapping({} as Record<HumanoidJointKey, string>)
+    setShowExternalModelDialog(false)
+
+    // proxy URL 사용 (presigned URL은 브라우저 CORS 문제 발생)
+    const proxyUrl = `/api/wasabi-proxy/external-models/${model.id}`
+
+    setExternalModelUrl(proxyUrl)
+    setExternalModelName(model.name)
+    setModelType('external')
+    saveCurrentExternalModel(proxyUrl, model.name)
+    saveExternalModel(model.name, proxyUrl, 'url')
+    setSavedExternalModels(getAllExternalModels())
+    localStorage.setItem(`wasabi-model-id-${model.name}`, model.id)
+
+    toast.success(`"${model.name}" 불러오기 완료!`)
+
+    // 본 매핑 메타데이터 별도 조회
+    try {
+      const result = await getModelUrlFromWasabi(model.id)
+      if (result.success && result.metadata?.boneMapping) {
+        setCustomBoneMapping(result.metadata.boneMapping as Record<HumanoidJointKey, string>)
+      }
+    } catch (error) {
+      console.warn('본 매핑 메타데이터 조회 실패:', error)
+    }
+  }
+
+  // Wasabi 모델을 배경으로 표시 (modelType 업데이트 후 목록에서 제거)
+  const handleMarkWasabiModelAsBackground = async (model: import('@/lib/storage').WasabiExternalModel) => {
+    const toastId = 'mark-background'
+    toast.loading(`"${model.name}" 배경으로 변경 중...`, { id: toastId })
+    try {
+      const response = await fetch('/api/external-models', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: model.id, modelType: 'background' }),
+      })
+      if (response.ok) {
+        setWasabiModels(prev => prev.filter(m => m.id !== model.id))
+        toast.success(`"${model.name}" 이 배경 모델로 설정되었습니다. 배경 다이얼로그에서 불러오세요.`, { id: toastId })
+      } else {
+        toast.error('배경 설정에 실패했습니다', { id: toastId })
+      }
+    } catch (error) {
+      console.error('배경 설정 오류:', error)
+      toast.error('배경 설정 중 오류가 발생했습니다', { id: toastId })
+    }
   }
 
   // 동기화 테스트
@@ -1092,6 +1235,9 @@ export default function Home() {
       const savedMapping = loadBoneMapping(externalModelName)
       if (savedMapping) {
         setCustomBoneMapping(savedMapping.mappings)
+        if (savedMapping.offsets) {
+          setBoneOffsets(savedMapping.offsets)
+        }
         toast.success('저장된 본 매핑을 불러왔습니다')
       }
     }
@@ -1105,16 +1251,27 @@ export default function Home() {
     }))
   }
 
+  // 본 오프셋 변경 (각도)
+  const handleBoneOffsetChange = (jointKey: HumanoidJointKey, offset: number) => {
+    setBoneOffsets(prev => ({
+      ...prev,
+      [jointKey]: offset
+    }))
+  }
+
   // 본 매핑 저장 (로컬 + Wasabi 동기화)
   const handleSaveBoneMapping = async () => {
     if (!externalModelName) {
       toast.error('모델 이름이 없습니다')
       return
     }
-    
+
+    // 오프셋이 있는 것만 저장
+    const activeOffsets = Object.keys(boneOffsets).length > 0 ? boneOffsets : undefined
+
     // 로컬에 저장
-    saveBoneMapping(externalModelName, customBoneMapping)
-    
+    saveBoneMapping(externalModelName, customBoneMapping, undefined, activeOffsets)
+
     // Wasabi에도 메타데이터 업데이트
     const modelId = localStorage.getItem(`wasabi-model-id-${externalModelName}`)
     if (modelId) {
@@ -1236,7 +1393,7 @@ export default function Home() {
             title="홈으로"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M21 13v10h-6v-6h-6v6h-6v-10h-3l12-12 12 12h-3zm-1-5.907v-5.093h-3v2.093l3 3z"/>
+              <path d="M21 13v10h-6v-6h-6v6h-6v-10h-3l12-12 12 12h-3zm-1-5.907v-5.093h-3v2.093l3 3z" />
             </svg>
           </Link>
           <div>
@@ -1270,30 +1427,27 @@ export default function Home() {
       <div className="flex flex-1 overflow-hidden">
         {/* 블록 코딩 / Python 에디터 영역 */}
         <div
-          className={`border-r border-gray-700 flex flex-col transition-all duration-300 ${
-            isWorkspaceMinimized ? 'w-12' : 'w-1/2'
-          }`}
+          className={`border-r border-gray-700 flex flex-col transition-all duration-300 ${isWorkspaceMinimized ? 'w-12' : 'w-1/2'
+            }`}
         >
           <div className="bg-gray-800 px-4 py-2 border-b border-gray-700 flex items-center justify-between">
             {!isWorkspaceMinimized && (
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setEditorMode('block')}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-t transition-colors ${
-                    editorMode === 'block'
-                      ? 'bg-gray-700 text-white'
-                      : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-                  }`}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-t transition-colors ${editorMode === 'block'
+                    ? 'bg-gray-700 text-white'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                    }`}
                 >
                   블록 코딩
                 </button>
                 <button
                   onClick={() => setEditorMode('python')}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-t transition-colors ${
-                    editorMode === 'python'
-                      ? 'bg-gray-700 text-white'
-                      : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-                  }`}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-t transition-colors ${editorMode === 'python'
+                    ? 'bg-gray-700 text-white'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                    }`}
                 >
                   Python
                 </button>
@@ -1326,9 +1480,8 @@ export default function Home() {
           <div className="flex-1 relative overflow-hidden">
             {/* Blockly 워크스페이스 */}
             <div
-              className={`absolute inset-0 transition-opacity duration-300 ${
-                isWorkspaceMinimized || editorMode !== 'block' ? 'opacity-0 pointer-events-none' : 'opacity-100'
-              }`}
+              className={`absolute inset-0 transition-opacity duration-300 ${isWorkspaceMinimized || editorMode !== 'block' ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                }`}
               key={workspaceXml}
             >
               <BlocklyWorkspace
@@ -1338,9 +1491,8 @@ export default function Home() {
             </div>
             {/* Python 에디터 */}
             <div
-              className={`absolute inset-0 flex transition-opacity duration-300 ${
-                isWorkspaceMinimized || editorMode !== 'python' ? 'opacity-0 pointer-events-none' : 'opacity-100'
-              }`}
+              className={`absolute inset-0 flex transition-opacity duration-300 ${isWorkspaceMinimized || editorMode !== 'python' ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                }`}
             >
               <div className={`transition-all duration-300 ${showPythonHelp ? 'w-1/2' : 'w-full'}`}>
                 <PythonEditor
@@ -1459,9 +1611,8 @@ export default function Home() {
         </div>
 
         {/* 3D 뷰 영역 */}
-        <div className={`flex flex-col transition-all duration-300 ${
-          isWorkspaceMinimized ? 'flex-1' : 'w-1/2'
-        }`}>
+        <div className={`flex flex-col transition-all duration-300 ${isWorkspaceMinimized ? 'flex-1' : 'w-1/2'
+          }`}>
           <div className="flex-1 relative">
             <RobotScene
               jointAngles={jointAngles}
@@ -1470,6 +1621,7 @@ export default function Home() {
               externalModelUrl={externalModelUrl}
               onBonesFound={handleBonesFound}
               customBoneMapping={Object.keys(customBoneMapping).length > 0 ? customBoneMapping : undefined}
+              boneOffsets={Object.keys(boneOffsets).length > 0 ? boneOffsets : undefined}
               backgroundModelUrl={backgroundModelUrl || undefined}
               backgroundModelScale={backgroundModelScale}
             />
@@ -1480,41 +1632,37 @@ export default function Home() {
               <div className="flex flex-wrap gap-1 mt-2">
                 <button
                   onClick={() => setModelType('gundam')}
-                  className={`px-2 py-1 text-xs rounded ${
-                    modelType === 'gundam'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
+                  className={`px-2 py-1 text-xs rounded ${modelType === 'gundam'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
                 >
                   Mech
                 </button>
                 <button
                   onClick={() => setModelType('soldier')}
-                  className={`px-2 py-1 text-xs rounded ${
-                    modelType === 'soldier'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
+                  className={`px-2 py-1 text-xs rounded ${modelType === 'soldier'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
                 >
                   Soldier
                 </button>
                 <button
                   onClick={() => setModelType('robot')}
-                  className={`px-2 py-1 text-xs rounded ${
-                    modelType === 'robot'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
+                  className={`px-2 py-1 text-xs rounded ${modelType === 'robot'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
                 >
                   Robot
                 </button>
                 <button
                   onClick={() => setShowExternalModelDialog(true)}
-                  className={`px-2 py-1 text-xs rounded ${
-                    modelType === 'external'
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
+                  className={`px-2 py-1 text-xs rounded ${modelType === 'external'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
                 >
                   외부 모델
                 </button>
@@ -1523,11 +1671,10 @@ export default function Home() {
               <div className="flex flex-wrap items-center gap-1 mt-2">
                 <button
                   onClick={() => setShowBackgroundDialog(true)}
-                  className={`px-2 py-1 text-xs rounded ${
-                    backgroundModelUrl
-                      ? 'bg-teal-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
+                  className={`px-2 py-1 text-xs rounded ${backgroundModelUrl
+                    ? 'bg-teal-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
                 >
                   배경
                 </button>
@@ -1606,11 +1753,46 @@ export default function Home() {
               />
             </div>
 
-            {/* 본 매핑 패널 */}
+            {/* 본 매핑 패널 - 드래그 가능 */}
             {showBoneMappingPanel && modelType === 'external' && (
-              <div className="absolute top-4 left-4 w-80 max-h-[60vh] overflow-y-auto bg-gray-800/95 backdrop-blur-sm rounded-lg border border-gray-700 p-4" style={{ left: '200px' }}>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-white font-semibold">본 매핑 설정</h3>
+              <div
+                className="absolute w-96 max-h-[70vh] flex flex-col bg-gray-800/95 backdrop-blur-sm rounded-lg border border-gray-700"
+                style={{ left: boneMappingPanelPos.x, top: boneMappingPanelPos.y }}
+              >
+                {/* 드래그 핸들 (헤더) */}
+                <div
+                  className="flex items-center justify-between px-4 py-3 cursor-move select-none border-b border-gray-700"
+                  onMouseDown={(e) => {
+                    boneMappingDragRef.current = {
+                      startX: e.clientX,
+                      startY: e.clientY,
+                      initX: boneMappingPanelPos.x,
+                      initY: boneMappingPanelPos.y,
+                    }
+                    const onMove = (ev: MouseEvent) => {
+                      if (!boneMappingDragRef.current) return
+                      const dx = ev.clientX - boneMappingDragRef.current.startX
+                      const dy = ev.clientY - boneMappingDragRef.current.startY
+                      setBoneMappingPanelPos({
+                        x: boneMappingDragRef.current.initX + dx,
+                        y: boneMappingDragRef.current.initY + dy,
+                      })
+                    }
+                    const onUp = () => {
+                      boneMappingDragRef.current = null
+                      document.removeEventListener('mousemove', onMove)
+                      document.removeEventListener('mouseup', onUp)
+                    }
+                    document.addEventListener('mousemove', onMove)
+                    document.addEventListener('mouseup', onUp)
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <svg className="w-3.5 h-3.5 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-6 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
+                    </svg>
+                    <h3 className="text-white font-semibold text-sm">본 매핑 설정</h3>
+                  </div>
                   <button
                     onClick={() => setShowBoneMappingPanel(false)}
                     className="text-gray-400 hover:text-white"
@@ -1619,88 +1801,108 @@ export default function Home() {
                   </button>
                 </div>
 
-                <div className="text-xs text-gray-400 mb-3">
-                  모델: {externalModelName || '알 수 없음'}<br />
-                  발견된 본: {availableBones.length}개 | 자동 매핑: {currentBoneMappings.length}개
-                  {availableBones.length > 0 && currentBoneMappings.length === 0 && (
-                    <div className="text-yellow-400 mt-1">
-                      자동 매핑되지 않았습니다. 수동으로 본을 선택하세요.
-                    </div>
-                  )}
-                  {availableBones.length === 0 && (
-                    <div className="text-red-400 mt-1">
-                      모델에서 본/노드를 찾을 수 없습니다.
-                    </div>
-                  )}
-                </div>
+                {/* 스크롤 가능한 본문 */}
+                <div className="overflow-y-auto flex-1 p-4">
 
-                {mappingTestResult && (
-                  <div className={`text-xs mb-3 p-2 rounded ${mappingTestResult.includes('완료') ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400'}`}>
-                    {mappingTestResult}
+                  <div className="text-xs text-gray-400 mb-3">
+                    모델: {externalModelName || '알 수 없음'}<br />
+                    발견된 본: {availableBones.length}개 | 자동 매핑: {currentBoneMappings.length}개
+                    {availableBones.length > 0 && currentBoneMappings.length === 0 && (
+                      <div className="text-yellow-400 mt-1">
+                        자동 매핑되지 않았습니다. 수동으로 본을 선택하세요.
+                      </div>
+                    )}
+                    {availableBones.length === 0 && (
+                      <div className="text-red-400 mt-1">
+                        모델에서 본/노드를 찾을 수 없습니다.
+                      </div>
+                    )}
                   </div>
-                )}
 
-                <div className="space-y-2">
-                  {/* 관절 그룹별로 표시 */}
-                  {[
-                    { label: '머리/몸통', joints: ['torso', 'neckYaw', 'neckPitch'] as HumanoidJointKey[] },
-                    { label: '왼팔', joints: ['leftShoulderPitch', 'leftShoulderYaw', 'leftElbow', 'leftWrist', 'leftGrip'] as HumanoidJointKey[] },
-                    { label: '오른팔', joints: ['rightShoulderPitch', 'rightShoulderYaw', 'rightElbow', 'rightWrist', 'rightGrip'] as HumanoidJointKey[] },
-                    { label: '왼다리', joints: ['leftHipPitch', 'leftHipYaw', 'leftKnee', 'leftAnkle'] as HumanoidJointKey[] },
-                    { label: '오른다리', joints: ['rightHipPitch', 'rightHipYaw', 'rightKnee', 'rightAnkle'] as HumanoidJointKey[] },
-                  ].map(group => (
-                    <div key={group.label} className="border-b border-gray-700 pb-2">
-                      <div className="text-xs text-cyan-400 font-medium mb-1">{group.label}</div>
-                      {group.joints.map(jointKey => {
-                        const currentMapping = currentBoneMappings.find(m => m.jointKey === jointKey)
-                        const selectedBone = customBoneMapping[jointKey] || currentMapping?.boneName || ''
-
-                        return (
-                          <div key={jointKey} className="flex items-center gap-2 mb-1">
-                            <span className="text-xs text-gray-400 w-24 truncate" title={jointKey}>
-                              {jointKey}
-                            </span>
-                            <select
-                              value={selectedBone}
-                              onChange={(e) => handleBoneMappingChange(jointKey, e.target.value)}
-                              className="flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-500"
-                            >
-                              <option value="">-- 선택 안함 --</option>
-                              {availableBones.map(bone => (
-                                <option key={bone} value={bone}>{bone}</option>
-                              ))}
-                            </select>
-                            {selectedBone && (
-                              <span className="text-green-400 text-xs">✓</span>
-                            )}
-                          </div>
-                        )
-                      })}
+                  {mappingTestResult && (
+                    <div className={`text-xs mb-3 p-2 rounded ${mappingTestResult.includes('완료') ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400'}`}>
+                      {mappingTestResult}
                     </div>
-                  ))}
-                </div>
+                  )}
 
-                <div className="flex gap-2 mt-4">
-                  <button
-                    onClick={handleAutoMapAll}
-                    className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded"
-                  >
-                    전체 매핑
-                  </button>
-                  <button
-                    onClick={handleSaveBoneMapping}
-                    className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded"
-                  >
-                    동기화
-                  </button>
-                  <button
-                    onClick={handleTestBoneMapping}
-                    disabled={isMappingTesting}
-                    className="flex-1 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 text-white text-sm rounded"
-                  >
-                    {isMappingTesting ? '테스트중...' : '테스트'}
-                  </button>
-                </div>
+                  <div className="space-y-2">
+                    {/* 헤더 */}
+                    <div className="flex items-center gap-2 text-[10px] text-gray-500 px-1">
+                      <span className="w-32">관절</span>
+                      <span className="flex-1">본 이름</span>
+                      <span className="w-16 text-center">오프셋(°)</span>
+                    </div>
+                    {/* 관절 그룹별로 표시 */}
+                    {[
+                      { label: '머리/몸통', joints: ['torso', 'neckYaw', 'neckPitch'] as HumanoidJointKey[] },
+                      { label: '왼팔', joints: ['leftShoulderPitch', 'leftShoulderYaw', 'leftElbow', 'leftWrist', 'leftGrip'] as HumanoidJointKey[] },
+                      { label: '오른팔', joints: ['rightShoulderPitch', 'rightShoulderYaw', 'rightElbow', 'rightWrist', 'rightGrip'] as HumanoidJointKey[] },
+                      { label: '왼다리', joints: ['leftHipPitch', 'leftHipYaw', 'leftKnee', 'leftAnkle'] as HumanoidJointKey[] },
+                      { label: '오른다리', joints: ['rightHipPitch', 'rightHipYaw', 'rightKnee', 'rightAnkle'] as HumanoidJointKey[] },
+                    ].map(group => (
+                      <div key={group.label} className="border-b border-gray-700 pb-2">
+                        <div className="text-xs text-cyan-400 font-medium mb-1">{group.label}</div>
+                        {group.joints.map(jointKey => {
+                          const currentMapping = currentBoneMappings.find(m => m.jointKey === jointKey)
+                          const selectedBone = customBoneMapping[jointKey] || currentMapping?.boneName || ''
+                          const offset = boneOffsets[jointKey] ?? 0
+
+                          return (
+                            <div key={jointKey} className="flex items-center gap-1 mb-1">
+                              <span className="text-xs text-gray-300 w-32 truncate shrink-0" title={jointKey}>
+                                {JOINT_DISPLAY_NAMES[jointKey]}
+                              </span>
+                              <select
+                                value={selectedBone}
+                                onChange={(e) => handleBoneMappingChange(jointKey, e.target.value)}
+                                className="flex-1 min-w-0 bg-gray-700 border border-gray-600 rounded px-1 py-1 text-xs text-white focus:outline-none focus:border-cyan-500"
+                              >
+                                <option value="">-- 없음 --</option>
+                                {availableBones.map(bone => (
+                                  <option key={bone} value={bone}>{translateBoneName(bone)}</option>
+                                ))}
+                              </select>
+                              <input
+                                type="number"
+                                value={offset}
+                                onChange={(e) => handleBoneOffsetChange(jointKey, parseFloat(e.target.value) || 0)}
+                                className="w-16 shrink-0 bg-gray-700 border border-gray-600 rounded px-1 py-1 text-xs text-white text-right focus:outline-none focus:border-orange-500"
+                                placeholder="0"
+                                step="5"
+                                title="기본 자세 오프셋 (도)"
+                              />
+                              {selectedBone && (
+                                <span className="text-green-400 text-xs shrink-0">✓</span>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      onClick={handleAutoMapAll}
+                      className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded"
+                    >
+                      전체 매핑
+                    </button>
+                    <button
+                      onClick={handleSaveBoneMapping}
+                      className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded"
+                    >
+                      동기화
+                    </button>
+                    <button
+                      onClick={handleTestBoneMapping}
+                      disabled={isMappingTesting}
+                      className="flex-1 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 text-white text-sm rounded"
+                    >
+                      {isMappingTesting ? '테스트중...' : '테스트'}
+                    </button>
+                  </div>
+                </div> {/* overflow-y-auto */}
               </div>
             )}
           </div>
@@ -1742,6 +1944,75 @@ export default function Home() {
             <h2 className="text-xl font-bold text-white mb-4">외부 모델 불러오기</h2>
 
             <div className="space-y-4">
+              {/* Wasabi 클라우드 모델 목록 */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm text-gray-400 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                    </svg>
+                    Wasabi 클라우드 모델
+                  </label>
+                  <button
+                    onClick={handleLoadWasabiModels}
+                    disabled={wasabiModelsLoading}
+                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white text-xs rounded flex items-center gap-1"
+                  >
+                    {wasabiModelsLoading ? (
+                      <>
+                        <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        로딩 중...
+                      </>
+                    ) : '새로고침'}
+                  </button>
+                </div>
+                {wasabiModels.length === 0 && !wasabiModelsLoading ? (
+                  <div className="text-xs text-gray-500 text-center py-3 bg-gray-700/50 rounded-lg">
+                    새로고침을 눌러 클라우드 모델을 불러오세요
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {wasabiModels.map((model) => (
+                      <div
+                        key={model.id}
+                        className="flex items-center justify-between bg-gray-700 rounded-lg px-3 py-2"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-white text-sm font-medium truncate">{model.name}</div>
+                          <div className="text-gray-400 text-xs">
+                            클라우드 • {(model.size / 1024 / 1024).toFixed(1)}MB • {new Date(model.timestamp).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <div className="flex gap-1 ml-2 shrink-0">
+                          <button
+                            onClick={() => handleLoadWasabiModel(model)}
+                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded"
+                          >
+                            불러오기
+                          </button>
+                          <button
+                            onClick={() => handleMarkWasabiModelAsBackground(model)}
+                            className="px-2 py-1 bg-teal-700 hover:bg-teal-600 text-white text-xs rounded"
+                            title="배경 모델로 표시"
+                          >
+                            배경
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-gray-600" />
+                <span className="text-gray-500 text-xs">로컬 저장 모델</span>
+                <div className="flex-1 h-px bg-gray-600" />
+              </div>
+
               {/* 저장된 모델 목록 */}
               {savedExternalModels.length > 0 && (
                 <div>

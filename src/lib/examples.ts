@@ -50,7 +50,7 @@ export const EXAMPLE_PROGRAMS = [
   },
   {
     name: '걷기',
-    description: '로봇이 제자리에서 걷는 동작을 합니다',
+    description: '로봇이 앞으로 걸어갑니다',
     xml: `<xml xmlns="https://developers.google.com/blockly/xml">
   <block type="humanoid_reset" x="20" y="20">
     <next>
@@ -58,7 +58,7 @@ export const EXAMPLE_PROGRAMS = [
         <field name="POSE">walk_ready</field>
         <next>
           <block type="humanoid_wait">
-            <field name="DURATION">0.5</field>
+            <field name="DURATION">0.3</field>
             <next>
               <block type="controls_repeat_ext">
                 <value name="TIMES">
@@ -88,15 +88,11 @@ export const EXAMPLE_PROGRAMS = [
                             <field name="ELBOW">0</field>
                             <field name="WRIST">0</field>
                             <next>
-                              <block type="humanoid_wait">
-                                <field name="DURATION">0.4</field>
+                              <block type="humanoid_move_forward">
+                                <field name="DISTANCE">0.5</field>
                                 <next>
-                                  <block type="humanoid_set_leg">
-                                    <field name="LEG">left</field>
-                                    <field name="HIP_PITCH">-15</field>
-                                    <field name="HIP_YAW">0</field>
-                                    <field name="KNEE">0</field>
-                                    <field name="ANKLE">0</field>
+                                  <block type="humanoid_wait">
+                                    <field name="DURATION">0.3</field>
                                     <next>
                                       <block type="humanoid_set_leg">
                                         <field name="LEG">right</field>
@@ -119,15 +115,11 @@ export const EXAMPLE_PROGRAMS = [
                                                 <field name="ELBOW">0</field>
                                                 <field name="WRIST">0</field>
                                                 <next>
-                                                  <block type="humanoid_wait">
-                                                    <field name="DURATION">0.4</field>
+                                                  <block type="humanoid_move_forward">
+                                                    <field name="DISTANCE">0.5</field>
                                                     <next>
-                                                      <block type="humanoid_set_leg">
-                                                        <field name="LEG">right</field>
-                                                        <field name="HIP_PITCH">-15</field>
-                                                        <field name="HIP_YAW">0</field>
-                                                        <field name="KNEE">0</field>
-                                                        <field name="ANKLE">0</field>
+                                                      <block type="humanoid_wait">
+                                                        <field name="DURATION">0.3</field>
                                                       </block>
                                                     </next>
                                                   </block>
@@ -162,7 +154,7 @@ export const EXAMPLE_PROGRAMS = [
   },
   {
     name: '뛰기',
-    description: '로봇이 빠르게 뛰는 동작을 합니다',
+    description: '로봇이 빠르게 앞으로 달려갑니다',
     xml: `<xml xmlns="https://developers.google.com/blockly/xml">
   <block type="humanoid_reset" x="20" y="20">
     <next>
@@ -201,39 +193,49 @@ export const EXAMPLE_PROGRAMS = [
                         <field name="ELBOW">-45</field>
                         <field name="WRIST">0</field>
                         <next>
-                          <block type="humanoid_wait">
-                            <field name="DURATION">0.2</field>
+                          <block type="humanoid_move_forward">
+                            <field name="DISTANCE">0.8</field>
                             <next>
-                              <block type="humanoid_set_leg">
-                                <field name="LEG">right</field>
-                                <field name="HIP_PITCH">45</field>
-                                <field name="HIP_YAW">0</field>
-                                <field name="KNEE">90</field>
-                                <field name="ANKLE">-20</field>
+                              <block type="humanoid_wait">
+                                <field name="DURATION">0.15</field>
                                 <next>
                                   <block type="humanoid_set_leg">
-                                    <field name="LEG">left</field>
-                                    <field name="HIP_PITCH">-20</field>
+                                    <field name="LEG">right</field>
+                                    <field name="HIP_PITCH">45</field>
                                     <field name="HIP_YAW">0</field>
-                                    <field name="KNEE">0</field>
-                                    <field name="ANKLE">20</field>
+                                    <field name="KNEE">90</field>
+                                    <field name="ANKLE">-20</field>
                                     <next>
-                                      <block type="humanoid_set_arm">
-                                        <field name="ARM">left</field>
-                                        <field name="SHOULDER_PITCH">60</field>
-                                        <field name="SHOULDER_YAW">0</field>
-                                        <field name="ELBOW">-45</field>
-                                        <field name="WRIST">0</field>
+                                      <block type="humanoid_set_leg">
+                                        <field name="LEG">left</field>
+                                        <field name="HIP_PITCH">-20</field>
+                                        <field name="HIP_YAW">0</field>
+                                        <field name="KNEE">0</field>
+                                        <field name="ANKLE">20</field>
                                         <next>
                                           <block type="humanoid_set_arm">
-                                            <field name="ARM">right</field>
-                                            <field name="SHOULDER_PITCH">-40</field>
+                                            <field name="ARM">left</field>
+                                            <field name="SHOULDER_PITCH">60</field>
                                             <field name="SHOULDER_YAW">0</field>
                                             <field name="ELBOW">-45</field>
                                             <field name="WRIST">0</field>
                                             <next>
-                                              <block type="humanoid_wait">
-                                                <field name="DURATION">0.2</field>
+                                              <block type="humanoid_set_arm">
+                                                <field name="ARM">right</field>
+                                                <field name="SHOULDER_PITCH">-40</field>
+                                                <field name="SHOULDER_YAW">0</field>
+                                                <field name="ELBOW">-45</field>
+                                                <field name="WRIST">0</field>
+                                                <next>
+                                                  <block type="humanoid_move_forward">
+                                                    <field name="DISTANCE">0.8</field>
+                                                    <next>
+                                                      <block type="humanoid_wait">
+                                                        <field name="DURATION">0.15</field>
+                                                      </block>
+                                                    </next>
+                                                  </block>
+                                                </next>
                                               </block>
                                             </next>
                                           </block>
@@ -256,6 +258,89 @@ export const EXAMPLE_PROGRAMS = [
         </statement>
         <next>
           <block type="humanoid_reset"></block>
+        </next>
+      </block>
+    </next>
+  </block>
+</xml>`,
+  },
+  {
+    name: '앞으로 이동',
+    description: '로봇이 앞으로 3m 이동합니다',
+    xml: `<xml xmlns="https://developers.google.com/blockly/xml">
+  <block type="humanoid_reset" x="20" y="20">
+    <next>
+      <block type="humanoid_preset_pose">
+        <field name="POSE">walk_ready</field>
+        <next>
+          <block type="humanoid_move_forward">
+            <field name="DISTANCE">3</field>
+            <next>
+              <block type="humanoid_reset"></block>
+            </next>
+          </block>
+        </next>
+      </block>
+    </next>
+  </block>
+</xml>`,
+  },
+  {
+    name: '뒤로 이동',
+    description: '로봇이 뒤로 2m 이동합니다',
+    xml: `<xml xmlns="https://developers.google.com/blockly/xml">
+  <block type="humanoid_reset" x="20" y="20">
+    <next>
+      <block type="humanoid_preset_pose">
+        <field name="POSE">walk_ready</field>
+        <next>
+          <block type="humanoid_move_backward">
+            <field name="DISTANCE">2</field>
+            <next>
+              <block type="humanoid_reset"></block>
+            </next>
+          </block>
+        </next>
+      </block>
+    </next>
+  </block>
+</xml>`,
+  },
+  {
+    name: '옆으로 이동',
+    description: '로봇이 왼쪽으로 1m, 오른쪽으로 1m 이동합니다',
+    xml: `<xml xmlns="https://developers.google.com/blockly/xml">
+  <block type="humanoid_reset" x="20" y="20">
+    <next>
+      <block type="humanoid_preset_pose">
+        <field name="POSE">walk_ready</field>
+        <next>
+          <block type="humanoid_move_left">
+            <field name="DISTANCE">1</field>
+            <next>
+              <block type="humanoid_wait">
+                <field name="DURATION">0.5</field>
+                <next>
+                  <block type="humanoid_move_right">
+                    <field name="DISTANCE">2</field>
+                    <next>
+                      <block type="humanoid_wait">
+                        <field name="DURATION">0.5</field>
+                        <next>
+                          <block type="humanoid_move_left">
+                            <field name="DISTANCE">1</field>
+                            <next>
+                              <block type="humanoid_reset"></block>
+                            </next>
+                          </block>
+                        </next>
+                      </block>
+                    </next>
+                  </block>
+                </next>
+              </block>
+            </next>
+          </block>
         </next>
       </block>
     </next>
@@ -320,61 +405,20 @@ export const EXAMPLE_PROGRAMS = [
                                         <field name="WRIST">0</field>
                                         <next>
                                           <block type="humanoid_set_leg">
-                                            <field name="LEG">left</field>
+                                            <field name="LEG">right</field>
                                             <field name="HIP_PITCH">0</field>
-                                            <field name="HIP_YAW">0</field>
-                                            <field name="KNEE">0</field>
+                                            <field name="HIP_YAW">-20</field>
+                                            <field name="KNEE">30</field>
                                             <field name="ANKLE">0</field>
                                             <next>
-                                              <block type="humanoid_set_leg">
-                                                <field name="LEG">right</field>
-                                                <field name="HIP_PITCH">0</field>
-                                                <field name="HIP_YAW">-20</field>
-                                                <field name="KNEE">30</field>
-                                                <field name="ANKLE">0</field>
+                                              <block type="humanoid_wait">
+                                                <field name="DURATION">0.3</field>
                                                 <next>
-                                                  <block type="humanoid_wait">
-                                                    <field name="DURATION">0.3</field>
+                                                  <block type="humanoid_preset_pose">
+                                                    <field name="POSE">clap</field>
                                                     <next>
-                                                      <block type="humanoid_preset_pose">
-                                                        <field name="POSE">clap</field>
-                                                        <next>
-                                                          <block type="humanoid_wait">
-                                                            <field name="DURATION">0.3</field>
-                                                            <next>
-                                                              <block type="humanoid_set_arm">
-                                                                <field name="ARM">left</field>
-                                                                <field name="SHOULDER_PITCH">-90</field>
-                                                                <field name="SHOULDER_YAW">90</field>
-                                                                <field name="ELBOW">0</field>
-                                                                <field name="WRIST">0</field>
-                                                                <next>
-                                                                  <block type="humanoid_set_arm">
-                                                                    <field name="ARM">right</field>
-                                                                    <field name="SHOULDER_PITCH">-90</field>
-                                                                    <field name="SHOULDER_YAW">-90</field>
-                                                                    <field name="ELBOW">0</field>
-                                                                    <field name="WRIST">0</field>
-                                                                    <next>
-                                                                      <block type="humanoid_wait">
-                                                                        <field name="DURATION">0.3</field>
-                                                                        <next>
-                                                                          <block type="humanoid_set_leg">
-                                                                            <field name="LEG">right</field>
-                                                                            <field name="HIP_PITCH">0</field>
-                                                                            <field name="HIP_YAW">0</field>
-                                                                            <field name="KNEE">0</field>
-                                                                            <field name="ANKLE">0</field>
-                                                                          </block>
-                                                                        </next>
-                                                                      </block>
-                                                                    </next>
-                                                                  </block>
-                                                                </next>
-                                                              </block>
-                                                            </next>
-                                                          </block>
-                                                        </next>
+                                                      <block type="humanoid_wait">
+                                                        <field name="DURATION">0.3</field>
                                                       </block>
                                                     </next>
                                                   </block>
@@ -1000,50 +1044,22 @@ export const EXAMPLE_PROGRAMS = [
                             <next>
                               <block type="humanoid_set_leg">
                                 <field name="LEG">left</field>
-                                <field name="HIP_PITCH">-30</field>
-                                <field name="HIP_YAW">0</field>
-                                <field name="KNEE">60</field>
-                                <field name="ANKLE">-30</field>
+                                <field name="HIP_PITCH">-90</field>
+                                <field name="HIP_YAW">20</field>
+                                <field name="KNEE">30</field>
+                                <field name="ANKLE">0</field>
                                 <next>
                                   <block type="humanoid_set_leg">
                                     <field name="LEG">right</field>
-                                    <field name="HIP_PITCH">-30</field>
-                                    <field name="HIP_YAW">0</field>
-                                    <field name="KNEE">60</field>
-                                    <field name="ANKLE">-30</field>
+                                    <field name="HIP_PITCH">-90</field>
+                                    <field name="HIP_YAW">-20</field>
+                                    <field name="KNEE">30</field>
+                                    <field name="ANKLE">0</field>
                                     <next>
-                                      <block type="humanoid_torso">
-                                        <field name="ANGLE">15</field>
+                                      <block type="humanoid_wait">
+                                        <field name="DURATION">2</field>
                                         <next>
-                                          <block type="humanoid_wait">
-                                            <field name="DURATION">0.5</field>
-                                            <next>
-                                              <block type="humanoid_set_leg">
-                                                <field name="LEG">left</field>
-                                                <field name="HIP_PITCH">-90</field>
-                                                <field name="HIP_YAW">20</field>
-                                                <field name="KNEE">30</field>
-                                                <field name="ANKLE">0</field>
-                                                <next>
-                                                  <block type="humanoid_set_leg">
-                                                    <field name="LEG">right</field>
-                                                    <field name="HIP_PITCH">-90</field>
-                                                    <field name="HIP_YAW">-20</field>
-                                                    <field name="KNEE">30</field>
-                                                    <field name="ANKLE">0</field>
-                                                    <next>
-                                                      <block type="humanoid_wait">
-                                                        <field name="DURATION">2</field>
-                                                        <next>
-                                                          <block type="humanoid_reset"></block>
-                                                        </next>
-                                                      </block>
-                                                    </next>
-                                                  </block>
-                                                </next>
-                                              </block>
-                                            </next>
-                                          </block>
+                                          <block type="humanoid_reset"></block>
                                         </next>
                                       </block>
                                     </next>

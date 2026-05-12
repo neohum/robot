@@ -11,7 +11,7 @@ export async function GET(
     const filePath = path.join('/')
 
     // 허용된 경로만 프록시
-    const allowedPrefixes = ['creator-models/', 'library/']
+    const allowedPrefixes = ['creator-models/', 'library/', 'external-models/']
     if (!allowedPrefixes.some(prefix => filePath.startsWith(prefix))) {
       return NextResponse.json({ error: '접근이 거부되었습니다.' }, { status: 403 })
     }

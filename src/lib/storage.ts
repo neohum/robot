@@ -11,6 +11,7 @@ export interface SavedBoneMapping {
   modelName: string;
   timestamp: number;
   mappings: Record<HumanoidJointKey, string>;
+  offsets?: Record<HumanoidJointKey, number>;
   scale?: number;
 }
 
@@ -80,13 +81,15 @@ export const loadCurrentWorkspace = (): string | null => {
 export const saveBoneMapping = (
   modelName: string,
   mappings: Record<HumanoidJointKey, string>,
-  scale?: number
+  scale?: number,
+  offsets?: Record<HumanoidJointKey, number>
 ): void => {
   const allMappings = getAllBoneMappings();
   const mapping: SavedBoneMapping = {
     modelName,
     timestamp: Date.now(),
     mappings,
+    offsets,
     scale,
   };
 
